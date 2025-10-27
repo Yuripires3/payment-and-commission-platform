@@ -1,6 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, Users, FileText, TrendingUp, AlertCircle, CheckCircle } from "lucide-react"
-import { RecentInvoices } from "@/components/admin/recent-invoices"
+import { DollarSign, Users, TrendingUp } from "lucide-react"
 import { CommissionChart } from "@/components/admin/commission-chart"
 
 export function AdminDashboard() {
@@ -40,52 +39,17 @@ export function AdminDashboard() {
             </p>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Faturas Pendentes</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">47</div>
-            <p className="text-xs text-warning flex items-center gap-1 mt-1">
-              <AlertCircle className="h-3 w-3" />
-              Requer atenção
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Pagamentos Processados</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">892</div>
-            <p className="text-xs text-muted-foreground mt-1">Este mês</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Charts and Tables */}
-      <div className="grid gap-6 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
+      <div className="grid gap-6">
+        <Card>
           <CardHeader>
             <CardTitle>Evolução de Comissões</CardTitle>
             <CardDescription>Últimos 6 meses</CardDescription>
           </CardHeader>
           <CardContent>
             <CommissionChart />
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle>Faturas Recentes</CardTitle>
-            <CardDescription>Últimas importações</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RecentInvoices />
           </CardContent>
         </Card>
       </div>
