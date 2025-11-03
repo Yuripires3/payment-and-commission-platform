@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, BarChart3, LogOut, Award, ChevronRight, Settings } from "lucide-react"
+import { LayoutDashboard, BarChart3, LogOut, Award, ChevronRight, Settings, BookOpen, Calculator, History, Receipt, Users } from "lucide-react"
 import {
   Sidebar,
   SidebarContent,
@@ -21,8 +21,14 @@ import { useState } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
 
 const bonificacoesSubmenu = [
-  { label: "Gerenciamento de Regras", href: "/admin/bonificacoes/cadastro-de-regras"},
-  { label: "Bonificação Valores", href: "/admin/bonificacoes/visualizar-regras"},
+  { label: "Regras de Bonificação", href: "/admin/bonificacoes/regras", icon: BookOpen },
+  { label: "Calcular Bonificação", href: "/admin/bonificacoes/calculo", icon: Calculator },
+  { label: "Histórico de Bonificações", href: "/admin/bonificacoes/historico", icon: History },
+  { label: "Extrato de Descontos", href: "/admin/bonificacoes/extrato-descontos", icon: Receipt },
+]
+
+const configuracoesSubmenu = [
+  { label: "Cadastro de usuários", href: "/admin/configuracoes/cadastro-de-usuarios", icon: Users },
 ]
 
 export function AdminSidebar() {
@@ -74,15 +80,32 @@ export function AdminSidebar() {
             </SidebarMenuButton>
             {isBonificacoesOpen && (
               <SidebarMenuSub>
-                {bonificacoesSubmenu.map((subItem) => (
-                  <SidebarMenuSubItem key={subItem.href}>
-                    <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
-                      <Link href={subItem.href}>
-                        <span>{subItem.label}</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                ))}
+                {bonificacoesSubmenu
+                  .filter((subItem) => {
+                    // Ocultar "Calcular Bonificação" para usuários com classificacao MRKT
+                    if (subItem.href === "/admin/bonificacoes/calculo") {
+                      const classificacao = user?.classificacao?.toUpperCase()
+                      const role = user?.role?.toUpperCase()
+                      // Verificar tanto classificacao quanto role (case-insensitive)
+                      if (classificacao === "MRKT" || role === "MRKT") {
+                        return false
+                      }
+                    }
+                    return true
+                  })
+                  .map((subItem) => {
+                    const IconComponent = subItem.icon
+                    return (
+                      <SidebarMenuSubItem key={subItem.href}>
+                        <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                          <Link href={subItem.href}>
+                            <IconComponent className="h-4 w-4" />
+                            <span>{subItem.label}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )
+                  })}
               </SidebarMenuSub>
             )}
           </SidebarMenuItem>
@@ -110,13 +133,19 @@ export function AdminSidebar() {
               </SidebarMenuButton>
               {isConfigOpen && (
                 <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === "/admin/configuracoes/cadastro-de-usuarios"}>
-                      <Link href="/admin/configuracoes/cadastro-de-usuarios">
-                        <span>Cadastro de usuários</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
+                  {configuracoesSubmenu.map((subItem) => {
+                    const IconComponent = subItem.icon
+                    return (
+                      <SidebarMenuSubItem key={subItem.href}>
+                        <SidebarMenuSubButton asChild isActive={pathname === subItem.href}>
+                          <Link href={subItem.href}>
+                            <IconComponent className="h-4 w-4" />
+                            <span>{subItem.label}</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )
+                  })}
                 </SidebarMenuSub>
               )}
             </SidebarMenuItem>

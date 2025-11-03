@@ -1,153 +1,99 @@
+/* ===========================================
+   🔹 IMPORTS E CONFIGURAÇÕES GERAIS
+=========================================== */
+@import "tailwindcss";            /* Importa Tailwind principal */
+@import "tw-animate-css";         /* Importa biblioteca de animações extras */
+@custom-variant dark (&:is(.dark *)); /* Define suporte para modo escuro */
+
+/* ===========================================
+   🎨 TEMA PRINCIPAL (modo claro)
+=========================================== */
 :root {
-  /* Branding QV - Light */
-  --color-primary: #0f2c50; /* Azul escuro */
-  --color-primary-hover: #384c6d; /* Azul claro (hover) */
-  --color-accent: #f58220; /* Laranja */
-  --color-success: #00a2a5; /* Verde */
-  --color-purple: #482c59; /* Roxo auxiliar */
-  --color-neutral-700: #58595b; /* Cinza escuro */
-  --color-neutral-300: #bcbec0; /* Cinza claro */
+  /* -------------------------
+     🎯 Branding principal QV
+  -------------------------- */
+  --color-primary: oklch(0.45 0.065 259);       /* Azul escuro principal */
+  --color-primary-hover: oklch(0.53 0.05 252);  /* Azul claro (hover) */
+  --color-accent: oklch(0.78 0.16 55);          /* Laranja corporativo */
+  --color-success: oklch(0.67 0.07 192);        /* Verde de sucesso */
 
-  /* shadcn/ui semantic tokens (no HSL wrapper to keep hex precision) */
-  --background: #ffffff; /* Light por padrão */
-  --foreground: #0b0d12;
-  --card: #ffffff;
-  --card-foreground: #0b0d12;
-  --popover: #ffffff;
-  --popover-foreground: #0b0d12;
-  --primary: var(--color-primary);
-  --primary-foreground: #ffffff;
-  --secondary: #f3f5f8;
-  --secondary-foreground: #0b0d12;
-  --muted: #f3f5f8;
-  --muted-foreground: var(--color-neutral-700);
-  --accent: var(--color-accent);
-  --accent-foreground: #1b1002;
-  --destructive: #c0362c;
-  --destructive-foreground: #fff8f8;
-  --success: var(--color-success);
-  --success-foreground: #011415;
-  --border: #e0e3e8;
-  --input: #e0e3e8;
-  --ring: var(--color-primary-hover);
-}
+  /* -------------------------
+     ⚙️ Cores base da interface
+  -------------------------- */
+  --background: oklch(0.98 0.002 264);          /* Fundo branco geral */
+  --foreground: oklch(0.15 0.01 264);           /* Texto padrão */
+  --card: oklch(1 0 0);                         /* Fundo dos cards */
+  --card-foreground: oklch(0.15 0.01 264);      /* Texto dentro dos cards */
+  --popover: oklch(1 0 0);                      /* Fundo de popovers - branco sólido */
+  --popover-foreground: oklch(0.15 0.01 264);   /* Texto de popovers */
+  --primary: var(--color-primary);              /* Cor primária padrão */
+  --primary-foreground: oklch(0.98 0.002 264);  /* Texto sobre o azul */
+  --secondary: oklch(0.92 0.01 264);            /* Fundo secundário */
+  --secondary-foreground: oklch(0.15 0.01 264); /* Texto secundário */
+  --muted: oklch(0.95 0.005 264);               /* Fundo neutro */
+  --muted-foreground: oklch(0.5 0.01 264);      /* Texto neutro */
+  --accent: oklch(0.95 0.005 264);             /* Cor de hover - cinza claro */
+  --accent-foreground: oklch(0.15 0.01 264);    /* Texto sobre hover */
+  --destructive: oklch(0.55 0.22 25);           /* Erros / perigo */
+  --destructive-foreground: oklch(0.98 0.002 264); /* Texto em erros */
+  --border: oklch(0.9 0.005 264);               /* Bordas padrão */
+  --input: oklch(0.9 0.005 264);                /* Bordas de input */
+  --ring: var(--color-primary-hover);           /* Anel de foco */
+  --filter-box-bg: #ffffff;                    /* Fundo do box de filtros */
 
-.dark {
-  /* Branding QV - Dark */
-  --color-primary: #0f2c50;
-  --color-primary-hover: #184286;
-  --color-accent: #f58220;
-  --color-success: #00a2a5;
-  --color-purple: #482c59;
-  --color-neutral-700: #58595b;
-  --color-neutral-300: #bcbec0;
+  /* -------------------------
+     🧭 Sidebar / Navegação
+  -------------------------- */
+  --sidebar: #232944;                /* Fundo da sidebar */
+  --sidebar-foreground: #ffffff;     /* Texto da sidebar */
+  --sidebar-primary: #687994;        /* Item ativo/hover */
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #184286;         /* Hover */
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #aeb4bd33;       /* Borda da sidebar */
+  --sidebar-ring: #4a586d;           /* Foco na sidebar */
 
-  --background: #0b0d12;
-  --foreground: #e8eaf0;
-  --card: #0f1218;
-  --card-foreground: #e8eaf0;
-  --popover: #0f1218;
-  --popover-foreground: #e8eaf0;
-  --primary: var(--color-primary);
-  --primary-foreground: #ffffff;
-  --secondary: #121723;
-  --secondary-foreground: #e8eaf0;
-  --muted: #121723;
-  --muted-foreground: #aab0b8;
-  --accent: var(--color-accent);
-  --accent-foreground: #1b1002;
-  --destructive: #c0362c;
-  --destructive-foreground: #fff8f8;
-  --success: var(--color-success);
-  --success-foreground: #011415;
-  --border: #1f2735;
-  --input: #1f2735;
-  --ring: var(--color-primary-hover);
-}
-
-/* Utility mapping to Tailwind tokens when using 'bg-[var(--primary)]' not desired */
-.brand-gradient-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-hover) 100%);
-}
-
-/* Improve focus visibility */
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-@import "tailwindcss";
-@import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
-
-:root {
-  /* Updated theme for professional B2B fintech platform */
-  --background: oklch(0.98 0.002 264);
-  --foreground: oklch(0.15 0.01 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.01 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.01 264);
-  --primary: oklch(0.45 0.15 264);
-  --primary-foreground: oklch(0.98 0.002 264);
-  --secondary: oklch(0.92 0.01 264);
-  --secondary-foreground: oklch(0.15 0.01 264);
-  --muted: oklch(0.95 0.005 264);
-  --muted-foreground: oklch(0.5 0.01 264);
-  --accent: oklch(0.55 0.18 162);
-  --accent-foreground: oklch(0.98 0.002 264);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.98 0.002 264);
-  --border: oklch(0.9 0.005 264);
-  --input: oklch(0.9 0.005 264);
-  --ring: oklch(0.45 0.15 264);
-  --chart-1: oklch(0.45 0.15 264);
+  /* -------------------------
+     📈 Gráficos e bordas
+  -------------------------- */
+  --chart-1: var(--primary);
   --chart-2: oklch(0.55 0.18 162);
   --chart-3: oklch(0.6 0.15 300);
   --chart-4: oklch(0.65 0.2 45);
   --chart-5: oklch(0.5 0.18 200);
-  --radius: 0.5rem;
-  /* Sidebar (branding) */
-  --sidebar: #193353; /* Azul escuro */
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #385789; /* hover/ativo */
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #184286; /* hover */
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #aeb4bd33; /* 20% */
-  --sidebar-ring: #184286;
-  --success: oklch(0.55 0.18 162);
-  --success-foreground: oklch(0.98 0.002 264);
-  --warning: oklch(0.65 0.2 45);
-  --warning-foreground: oklch(0.15 0.01 264);
+  --radius: 0.5rem;                  /* Raio de borda padrão */
+
+  /* -------------------------
+     🌑 Azul mais escuro derivado
+  -------------------------- */
+  --primary-dark: color-mix(in oklch, var(--primary) 85%, black);
 }
 
+/* ===========================================
+   🌙 TEMA ESCURO (modo dark)
+=========================================== */
 .dark {
-  /* Dark theme optimized for enterprise dashboard */
-  --background: oklch(0.12 0.01 264);
-  --foreground: oklch(0.95 0.005 264);
+  --background: oklch(0.12 0.01 264);           /* Fundo principal escuro */
+  --foreground: oklch(0.95 0.005 264);          /* Texto claro */
   --card: oklch(0.15 0.01 264);
   --card-foreground: oklch(0.95 0.005 264);
   --popover: oklch(0.15 0.01 264);
   --popover-foreground: oklch(0.95 0.005 264);
-  --primary: oklch(0.55 0.18 264);
+  --primary: color-mix(in oklch, var(--color-primary) 90%, black); /* Azul escuro reforçado */
   --primary-foreground: oklch(0.98 0.002 264);
   --secondary: oklch(0.2 0.01 264);
   --secondary-foreground: oklch(0.95 0.005 264);
   --muted: oklch(0.18 0.01 264);
   --muted-foreground: oklch(0.6 0.01 264);
-  --accent: oklch(0.55 0.18 162);
-  --accent-foreground: oklch(0.98 0.002 264);
+  --accent: var(--color-accent);
+  --accent-foreground: oklch(0.15 0.01 264);
   --destructive: oklch(0.5 0.2 25);
   --destructive-foreground: oklch(0.98 0.002 264);
   --border: oklch(0.22 0.01 264);
   --input: oklch(0.22 0.01 264);
-  --ring: oklch(0.55 0.18 264);
-  --chart-1: oklch(0.55 0.18 264);
-  --chart-2: oklch(0.55 0.18 162);
-  --chart-3: oklch(0.6 0.15 300);
-  --chart-4: oklch(0.65 0.2 45);
-  --chart-5: oklch(0.5 0.18 200);
+  --ring: color-mix(in oklch, var(--color-primary) 70%, white);
+
+  /* Sidebar no modo escuro */
   --sidebar: #011939;
   --sidebar-foreground: #e8eaf0;
   --sidebar-primary: #184286;
@@ -156,96 +102,111 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #18428666;
   --sidebar-ring: #184286;
-  --success: oklch(0.55 0.18 162);
-  --success-foreground: oklch(0.98 0.002 264);
-  --warning: oklch(0.65 0.2 45);
-  --warning-foreground: oklch(0.15 0.01 264);
 }
 
+/* ===========================================
+   🧩 MAPEAMENTO PARA TAILWIND (@theme inline)
+=========================================== */
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback";
+  --font-sans: "Geist", "Geist Fallback";       /* Fonte principal */
   --font-mono: "Geist Mono", "Geist Mono Fallback";
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
-  --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
 }
 
+/* ===========================================
+   🧱 ESTILOS BASE / AJUSTES GERAIS
+=========================================== */
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-  /* Tabela: cabeçalho com Azul Claro; linhas hover suave */
+  * { @apply border-border outline-ring/50; }     /* Borda e foco padrão */
+  body { @apply bg-background text-foreground; }  /* Fundo e texto da página */
+
+  /* -------------------------
+     🧾 Tabela - Cabeçalho
+  -------------------------- */
+  thead[data-slot="table-header"] tr,
   [data-slot="table-header"] tr {
-    background: var(--color-primary);
-    color: #ffffff;
+    background: #333b5f; /* Cor do fundo do cabeçalho - altere aqui */
+    color: #ffffff !important;       /* Cor do texto do cabeçalho - altere aqui */
   }
-  /* Garantir branco no cabeçalho mesmo com classes utilitárias */
-  [data-slot="table-header"] [data-slot="table-head"],
-  thead[data-slot="table-header"] th[data-slot="table-head"] {
-    color: #ffffff !important;
-  }
-  /* Não alterar cor ao passar o mouse no cabeçalho */
+  
+  /* Desabilita hover no cabeçalho das tabelas */
+  thead[data-slot="table-header"] tr:hover,
   [data-slot="table-header"] tr:hover,
-  thead[data-slot="table-header"] tr:hover {
-    background: var(--color-primary) !important;
+  thead tr:hover {
+    background: #333b5f !important; /* Mantém a cor original mesmo no hover */
   }
-  [data-slot="table-header"] [data-slot="table-head"]:hover,
-  thead[data-slot="table-header"] th[data-slot="table-head"]:hover {
-    color: #ffffff !important;
+  
+  /* Desabilita hover nos th do cabeçalho */
+  thead th:hover,
+  thead[data-slot="table-header"] th:hover {
+    background: inherit !important; /* Mantém a cor do tr pai */
   }
+  
+  thead[data-slot="table-header"] tr th,
+  [data-slot="table-header"] tr th {
+    color: #ffffff !important; /* Garante que o texto dos th também fique branco */
+  }
+
+  /* Hover suave nas linhas da tabela */
   [data-slot="table-row"]:hover {
-    background: #1529480d; /* 5% azul claro */
+    background: color-mix(in oklch, var(--primary) 6%, transparent);
   }
-  /* Sidebar branding */
+
+  /* -------------------------
+     📁 Sidebar (navegação)
+  -------------------------- */
   [data-slot="sidebar-inner"],
   [data-slot="sidebar"]:not([data-mobile="true"]) [data-slot="sidebar-inner"] {
-    background: var(--color-sidebar);
-    color: var(--color-sidebar-foreground);
+    background: var(--color-sidebar);         /* Fundo da sidebar */
+    color: var(--sidebar-foreground);         /* Texto da sidebar */
   }
-  [data-slot="sidebar-group-label"],
-  [data-slot="sidebar-menu-button"],
-  [data-slot="sidebar-menu-sub-button"] {
-    --sidebar-accent: var(--color-sidebar-primary);
-    --sidebar-accent-foreground: #ffffff;
+
+  /* Item ativo do menu lateral - cor de fundo diferente */
+  [data-slot="sidebar-menu-button"][data-active="true"],
+  [data-sidebar="menu-button"][data-active="true"] {
+    background: var(--sidebar-primary) !important; /* Cor de fundo do item ativo */
+    color: var(--sidebar-primary-foreground) !important; /* Cor do texto do item ativo */
+  }
+  
+  [data-slot="sidebar-menu-sub-button"][data-active="true"],
+  [data-sidebar="menu-sub-button"][data-active="true"] {
+    background: var(--sidebar-primary) !important; /* Cor de fundo do subitem ativo */
+    color: var(--sidebar-primary-foreground) !important; /* Cor do texto do subitem ativo */
+  }
+
+  /* -------------------------
+     📋 Select e Autocomplete (dropdowns)
+  -------------------------- */
+  /* Fundo branco sólido para SelectContent */
+  [data-radix-select-content],
+  [role="listbox"],
+  .bg-popover {
+    background: #ffffff !important; /* Fundo branco sólido - altere aqui */
+  }
+
+  /* Hover nos itens do Select - cor cinza clara */
+  [data-radix-select-item]:hover,
+  [role="option"]:hover,
+  button[class*="hover:bg-accent"]:hover {
+    background: #f5f5f5 !important; /* Cor de hover - altere aqui (ex: #f5f5f5) */
+    color: oklch(0.15 0.01 264) !important;
+  }
+
+  /* Foco nos itens do Select */
+  [data-radix-select-item][data-highlighted],
+  [role="option"][aria-selected="true"] {
+    background: #f5f5f5 !important; /* Cor de foco - altere aqui */
+    color: oklch(0.15 0.01 264) !important;
   }
 }

@@ -14,14 +14,20 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Criar conexão
+    // Criar conexão com charset UTF-8
     connection = await mysql.createConnection({
       host: process.env.DB_HOST,
       port: Number(process.env.DB_PORT || 3306),
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      charset: 'utf8mb4'
     })
+    
+    // Garantir charset UTF-8 na conexão
+    await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
+    await connection.execute("SET CHARACTER SET utf8mb4")
+    await connection.execute("SET character_set_connection=utf8mb4")
 
     // Extrair parâmetros
     const searchParams = request.nextUrl.searchParams
@@ -44,20 +50,26 @@ export async function GET(request: NextRequest) {
     const whereConditions: string[] = []
     const whereValues: any[] = []
 
-    if (operadora) { whereConditions.push("operadora = ?"); whereValues.push(operadora) }
-    if (tipo_faixa) { whereConditions.push("tipo_faixa = ?"); whereValues.push(tipo_faixa) }
-    if (produto) { whereConditions.push("produto = ?"); whereValues.push(produto) }
-    if (pagamento_por) { whereConditions.push("pagamento_por = ?"); whereValues.push(pagamento_por) }
-    if (tipo_beneficiario) { whereConditions.push("tipo_beneficiario = ?"); whereValues.push(tipo_beneficiario) }
-    if (parcela) { whereConditions.push("parcela = ?"); whereValues.push(parcela) }
-    if (entidade) { whereConditions.push("entidade LIKE ?"); whereValues.push(`%${entidade}%`) }
-    if (plano) { whereConditions.push("plano LIKE ?"); whereValues.push(`%${plano}%`) }
-    if (vigencia_inicio) { whereConditions.push("vigencia >= ?"); whereValues.push(vigencia_inicio) }
-    if (vigencia_fim) { whereConditions.push("vigencia <= ?"); whereValues.push(vigencia_fim) }
+    if (operadora && operadora.trim()) { whereConditions.push("operadora = ?"); whereValues.push(operadora.trim()) }
+    if (tipo_faixa && tipo_faixa.trim()) { whereConditions.push("tipo_faixa = ?"); whereValues.push(tipo_faixa.trim()) }
+    if (produto && produto.trim()) { whereConditions.push("produto = ?"); whereValues.push(produto.trim()) }
+    if (pagamento_por && pagamento_por.trim()) { whereConditions.push("pagamento_por = ?"); whereValues.push(pagamento_por.trim()) }
+    if (tipo_beneficiario && tipo_beneficiario.trim()) { whereConditions.push("tipo_beneficiario = ?"); whereValues.push(tipo_beneficiario.trim()) }
+    if (parcela && parcela.trim()) { whereConditions.push("parcela = ?"); whereValues.push(parcela.trim()) }
+    if (entidade && entidade.trim()) { whereConditions.push("entidade LIKE ?"); whereValues.push(`%${entidade.trim()}%`) }
+    if (plano && plano.trim()) { whereConditions.push("plano LIKE ?"); whereValues.push(`%${plano.trim()}%`) }
+    if (vigencia_inicio && vigencia_inicio.trim()) { whereConditions.push("vigencia >= ?"); whereValues.push(vigencia_inicio.trim()) }
+    if (vigencia_fim && vigencia_fim.trim()) { whereConditions.push("vigencia <= ?"); whereValues.push(vigencia_fim.trim()) }
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : ""
-    const sortColumn = sort || "vigencia"
-    const sortOrder = (order === "asc" || order === "desc") ? order.toUpperCase() : "DESC"
+
+    // Log para debug
+    console.log("=== DEBUG API REGRAS ===")
+    console.log("Filtros recebidos:", { operadora, tipo_faixa, produto, pagamento_por, tipo_beneficiario, parcela, entidade, plano, vigencia_inicio, vigencia_fim })
+    console.log("WHERE conditions:", whereConditions)
+    console.log("WHERE values:", whereValues)
+    console.log("WHERE clause:", whereClause)
+    console.log("========================")
 
     // Contar total
     const [countResult] = await connection.execute(
@@ -66,18 +78,32 @@ export async function GET(request: NextRequest) {
     )
     const total = (countResult as any[])[0]?.total || 0
 
+    console.log("Total de registros encontrados:", total)
+
     // Paginar
     const offset = (page - 1) * pageSize
 
-    // Buscar dados - construir query de forma mais simples
-    let query = `SELECT * FROM registro_bonificacao_valores_v2 ${whereClause} ORDER BY \`${sortColumn}\` ${sortOrder} LIMIT ${pageSize} OFFSET ${offset}`
+    // Ordenação fixa: 1) vigencia DESC, 2) registro DESC, 3) tipo_faixa ASC, 4) plano ASC (A-Z), 5) tipo_beneficiario DESC (Z-A - Titular antes de Dependente)
+    // Buscar dados com ordenação fixa múltipla - planos iguais agrupados com Titular antes de Dependente
+    let query = `SELECT * FROM registro_bonificacao_valores_v2 ${whereClause} ORDER BY \`vigencia\` DESC, \`registro\` DESC, \`tipo_faixa\` ASC, \`plano\` ASC, \`tipo_beneficiario\` DESC LIMIT ${pageSize} OFFSET ${offset}`
+    
+    console.log("Query executada:", query)
     
     const [rows] = await connection.execute(query, whereValues)
     
-    return NextResponse.json({
-      data: rows || [],
-      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
-    })
+    console.log("Registros retornados:", (rows as any[]).length)
+    
+    return NextResponse.json(
+      {
+        data: rows || [],
+        pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) }
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    )
   } catch (error) {
     console.error("Erro:", error)
     return NextResponse.json(
@@ -151,7 +177,13 @@ export async function POST(request: NextRequest) {
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
+      charset: 'utf8mb4'
     })
+    
+    // Garantir charset UTF-8 na conexão
+    await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
+    await connection.execute("SET CHARACTER SET utf8mb4")
+    await connection.execute("SET character_set_connection=utf8mb4")
 
     // Normalizar dados
     const normalizedData = {

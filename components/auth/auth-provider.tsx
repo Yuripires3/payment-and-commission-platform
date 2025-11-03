@@ -10,6 +10,7 @@ interface User {
   cpf: string
   usuario_login: string
   role: "admin" | "user"
+  classificacao?: string
   nome: string
   email: string
   area: string | null

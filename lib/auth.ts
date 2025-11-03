@@ -1,4 +1,5 @@
 import { jwtVerify } from "jose"
+import { getRuntimeJwtSecret } from "@/lib/runtime-auth"
 
 export interface User {
   id: string
@@ -12,7 +13,7 @@ export interface User {
 
 export async function verifyToken(token: string): Promise<User | null> {
   try {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+    const secret = getRuntimeJwtSecret()
 
     const { payload } = await jwtVerify(token, secret)
 

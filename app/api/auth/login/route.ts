@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { SignJWT } from "jose"
+import { getRuntimeJwtSecret } from "@/lib/runtime-auth"
 import { getDBConnection } from "@/lib/db"
 import { comparePassword } from "@/lib/security"
 
@@ -72,8 +73,8 @@ export async function POST(request: NextRequest) {
 
     console.log("[Auth] Login successful for user:", user.usuario_login, "role:", role)
 
-    // Create JWT token
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+    // Create JWT token (per-boot secret to force re-login after server restart)
+    const secret = getRuntimeJwtSecret()
 
     const token = await new SignJWT({
       userId: user.id.toString(),
@@ -99,6 +100,7 @@ export async function POST(request: NextRequest) {
       area: user.area,
       usuario_login: user.usuario_login,
       role,
+      classificacao: user.classificacao, // Incluir classificacao para permissões
     }
 
     const redirectPath = role === "admin" ? "/admin" : "/admin" // Por enquanto ambos vão para admin
