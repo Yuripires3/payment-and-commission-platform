@@ -2,19 +2,33 @@
 
 const os = require('os');
 
-// Função para obter o IP real da máquina
+// Função para obter o IP real da máquina (prioriza IPs não-internos)
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
+  const ips = [];
   
+  // Coletar todos os IPs não-internos
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      // Ignorar IPv6 e interfaces internas
+      // Ignorar IPv6 e interfaces internas (loopback)
       if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address;
+        ips.push(iface.address);
       }
     }
   }
-  // Fallback para 0.0.0.0 se não encontrar IP externo
+  
+  // Priorizar IPs que não são 172.x.x.x ou 192.168.x.x (IPs públicos primeiro)
+  const publicIPs = ips.filter(ip => !ip.startsWith('172.') && !ip.startsWith('192.168.'));
+  if (publicIPs.length > 0) {
+    return publicIPs[0];
+  }
+  
+  // Se não houver IP público, usar o primeiro IP privado
+  if (ips.length > 0) {
+    return ips[0];
+  }
+  
+  // Fallback para 0.0.0.0
   return '0.0.0.0';
 }
 
@@ -27,22 +41,36 @@ process.env.PORT = process.env.PORT || '3005';
 // Obter IP real para exibição
 const displayIP = getLocalIP();
 
-// PATCH CRÍTICO: Substituir os.hostname() para retornar o IP real
+// PATCH CRÍTICO: Substituir os.hostname() para SEMPRE retornar o IP real
 // Isso faz o Next.js usar o IP ao invés do hostname do container
 const originalHostname = os.hostname;
 os.hostname = function() {
+  // SEMPRE retornar o IP, nunca o hostname
   return displayIP;
 };
 
-// Função para substituir hostname do container pelo IP real
+// Também patchear require('os').hostname() caso seja chamado de forma diferente
+const originalOsModule = require.cache[require.resolve('os')];
+if (originalOsModule) {
+  originalOsModule.exports.hostname = function() {
+    return displayIP;
+  };
+}
+
+// Função para substituir QUALQUER hostname pelo IP real
 function replaceHostname(message) {
   if (typeof message === 'string') {
     // Substituir hostname do container (qualquer hex de 8+ caracteres) pelo IP real
+    // Também substituir qualquer hostname que não seja um IP válido
     return message
+      // Padrão: http://hostname:port
       .replace(/http:\/\/[a-f0-9]{8,}:\d+/g, `http://${displayIP}:${process.env.PORT}`)
       .replace(/http:\/\/[a-f0-9]{8,}/g, `http://${displayIP}`)
       .replace(/http:\/\/[a-f0-9]+:\d+/g, `http://${displayIP}:${process.env.PORT}`)
-      .replace(/http:\/\/[a-f0-9]+/g, `http://${displayIP}`);
+      .replace(/http:\/\/[a-f0-9]+/g, `http://${displayIP}`)
+      // Padrão genérico: qualquer string que não seja IP após http://
+      .replace(/http:\/\/(?!\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})([a-zA-Z0-9-]+):(\d+)/g, `http://${displayIP}:$2`)
+      .replace(/http:\/\/(?!\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})([a-zA-Z0-9-]+)/g, `http://${displayIP}`);
   }
   return message;
 }
@@ -113,4 +141,6 @@ try {
     process.exit(1);
   }
 }
+
+
 
