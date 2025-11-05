@@ -27,3 +27,19 @@ export async function getDBConnection() {
   return await mysql.createConnection(config)
 }
 
+/**
+ * Retorna o filtro SQL para descontos finalizados e ativos.
+ * OTIMIZAÇÃO: Assume que as colunas de staging sempre existem (criadas via migration).
+ */
+export function getDescontosStatusFilter(): string {
+  return "AND status = 'finalizado' AND is_active = TRUE"
+}
+
+/**
+ * @deprecated Use getDescontosStatusFilter() diretamente - as colunas sempre existem
+ * Mantido apenas para compatibilidade temporária
+ */
+export async function hasStagingFields(connection: any): Promise<boolean> {
+  return true // Sempre true - colunas criadas via migration
+}
+
