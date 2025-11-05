@@ -86,21 +86,55 @@ Após iniciar, a aplicação estará disponível em:
 
 ## Variáveis de Ambiente
 
-As variáveis podem ser configuradas de duas formas:
+**IMPORTANTE**: As variáveis de ambiente devem estar configuradas corretamente, caso contrário a aplicação pode pedir HTTP Basic Authentication.
 
-### 1. Arquivo .env (Recomendado)
-Crie um arquivo `.env` na raiz do projeto.
+### Verificar se as variáveis estão sendo passadas
 
-### 2. Variáveis de Sistema
-Exporte as variáveis antes de executar:
 ```bash
-export DB_HOST=192.168.1.193
-export DB_PASSWORD=sua_senha
-docker-compose up -d
+# Verificar variáveis do banco de dados
+docker compose exec app printenv | grep -i DB
+
+# Verificar todas as variáveis
+docker compose exec app printenv
+
+# Verificar variáveis específicas
+docker compose exec app printenv DB_HOST DB_USER DB_PASSWORD
 ```
 
-### 3. No docker-compose.yml
-Edite diretamente no arquivo (não recomendado para senhas).
+### Formas de configurar variáveis
+
+#### 1. Arquivo .env (Recomendado para desenvolvimento local)
+Crie um arquivo `.env` na raiz do projeto:
+```env
+DB_HOST=192.168.1.193
+DB_PORT=3306
+DB_USER=Indicadores
+DB_PASSWORD=sua_senha
+DB_NAME=indicadores
+```
+
+#### 2. No docker-compose.yml (não recomendado para senhas)
+As variáveis já estão definidas no compose com valores padrão.
+
+#### 3. No Coolify (Recomendado para produção)
+Configure as variáveis diretamente no painel do Coolify em "Environment Variables".
+
+### Variáveis Obrigatórias
+
+- `DB_HOST` - IP do servidor MySQL
+- `DB_PORT` - Porta do MySQL (geralmente 3306)
+- `DB_USER` - Usuário do banco
+- `DB_PASSWORD` - Senha do banco
+- `DB_NAME` - Nome do banco
+
+### Variáveis Opcionais (Elasticsearch)
+
+- `ELASTICSEARCH_HOST` - Host do Elasticsearch
+- `ELASTICSEARCH_PORT` - Porta do Elasticsearch (padrão: 9200)
+- `ELASTICSEARCH_USER` - Usuário do Elasticsearch
+- `ELASTICSEARCH_PASSWORD` - Senha do Elasticsearch
+
+Ver `ENV-VARIABLES.md` para documentação completa.
 
 ## Troubleshooting
 
