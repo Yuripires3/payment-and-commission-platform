@@ -33,6 +33,9 @@ ENV NEXT_TELEMETRY_DISABLED 1
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Instalar curl para health check (precisa ser antes de trocar para usuário não-root)
+RUN apk add --no-cache curl
+
 # Copiar arquivos necessários do builder
 # Copiar o standalone output (contém server.js e node_modules necessários)
 COPY --from=builder /app/.next/standalone ./
@@ -49,6 +52,10 @@ EXPOSE 3005
 
 ENV PORT 3005
 ENV HOSTNAME "0.0.0.0"
+
+# Health check - verifica se a aplicação está respondendo
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:3005/api/health || exit 1
 
 CMD ["node", "server.js"]
 
