@@ -5,41 +5,42 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Não usar args aqui - vamos usar environment diretamente
+      # Não usar args aqui - segredos devem estar apenas em runtime
     container_name: payment-and-commission-platform
-    restart: unless-stopped
+    restart: always
     ports:
+      # Publica a porta 3005 do container para o host
+      # Permite acesso via IP: http://<SEU-IP>:3005
       - "3005:3005"
     environment:
       # Variáveis de ambiente da aplicação
       - NODE_ENV=production
       - PORT=3005
       - HOST=0.0.0.0
+      - HOSTNAME=0.0.0.0
       - NEXT_TELEMETRY_DISABLED=1
       
       # Variáveis de ambiente do banco de dados MySQL
-      # IMPORTANTE: Essas variáveis devem estar no arquivo .env ou no Coolify
+      # IMPORTANTE: Configure essas variáveis no arquivo .env ou no Coolify
+      # NUNCA coloque senhas diretamente aqui - use variáveis de ambiente
       - DB_HOST=${DB_HOST:-192.168.1.193}
       - DB_PORT=${DB_PORT:-3306}
       - DB_USER=${DB_USER:-Indicadores}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME:-indicadores}
-      
-      # Outras variáveis de ambiente (se necessário)
-      # - API_KEY=${API_KEY:-}
-      # - JWT_SECRET=${JWT_SECRET:-}
     env_file:
       - .env
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3005/api/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 40s
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    # Comando para iniciar o servidor Next.js standalone
+    command: node server-start.js
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
-

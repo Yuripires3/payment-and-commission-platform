@@ -59,7 +59,7 @@ ENV PORT 3005
 ENV HOST "0.0.0.0"
 
 # Health check - verifica se a aplicação está respondendo
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
   CMD curl -f http://localhost:3005/api/health || exit 1
 
 # Iniciar aplicação usando script wrapper que força hostname a 0.0.0.0
