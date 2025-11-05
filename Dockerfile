@@ -43,8 +43,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copiar script de inicialização
+# Copiar script de inicialização e package.json customizado
 COPY server-start.js ./
+COPY package-standalone.json ./package.json
 
 # Ajustar permissões
 RUN chown -R nextjs:nodejs /app && \
