@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { jwtVerify } from "jose"
+import { getRuntimeJwtSecret } from "@/lib/runtime-auth"
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Public routes
-  if (pathname === "/login" || pathname === "/register" || pathname === "/") {
+  if (pathname === "/login" || pathname === "/") {
     return NextResponse.next()
   }
 
@@ -20,7 +21,7 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+      const secret = getRuntimeJwtSecret()
       const { payload } = await jwtVerify(token, secret)
 
       // Admin-only: /admin/configuracoes
@@ -42,5 +43,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/register"],
+  matcher: ["/admin/:path*"],
 }
+

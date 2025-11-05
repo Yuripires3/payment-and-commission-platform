@@ -66,9 +66,12 @@ A aplicação estará disponível em: http://localhost:3000
 - `/login` - Página de login
 - (Cadastro público removido) cadastro é feito pelo admin
 - `/admin` - Dashboard administrativo
-- `/admin/bonificacoes/cadastro-de-regras` - Cadastro de regras de bonificação
-- `/admin/bonificacoes/visualizar-regras` - Visualização e filtros de regras
+- `/admin/bonificacoes/regras` - Gerenciamento de regras de bonificação (cadastro, edição, visualização)
+- `/admin/bonificacoes/calculo` - Cálculo de bonificações
+- `/admin/bonificacoes/historico` - Histórico de bonificações
+- `/admin/bonificacoes/extrato-descontos` - Extrato de descontos
 - `/admin/relatorios` - Relatórios
+- `/admin/configuracoes/cadastro-de-usuarios` - Cadastro de usuários (admin only)
 
 - ### API Routes
 - `POST /api/admin/users` - Criar usuário (somente admin)

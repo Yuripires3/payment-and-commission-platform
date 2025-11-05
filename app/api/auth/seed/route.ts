@@ -46,19 +46,18 @@ async function seedAdmin() {
     const nextIdNum = Number(max_id) + 1
     const nextId = String(nextIdNum).padStart(5, "0")
 
-    await connection.execute(
+    const [insertResult] = await connection.execute(
       `INSERT INTO registro_usuarios_web_bonificacao 
        (id, cpf, nome, email, area, usuario_login, senha, classificacao) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [nextId, "000.000.000-00", "Administrador do Sistema", "ti@qvsaude.com.br", "Financeiro", "admin", adminSenhaHash, "ADMIN"]
+      [nextId, adminCPF, "Administrador do Sistema", "ti@qvsaude.com.br", "Financeiro", "admin", adminSenhaHash, "ADMIN"]
     )
-
-    const insertResult = result as any
+    const insertInfo = insertResult as any
 
     return NextResponse.json({
       success: true,
       message: "Usuário admin criado com sucesso",
-      user_id: insertResult.insertId,
+      user_id: insertInfo?.insertId ?? nextId,
     })
   } catch (error) {
     console.error("Erro ao criar admin:", error)

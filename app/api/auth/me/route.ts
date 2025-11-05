@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { jwtVerify } from "jose"
+import { getRuntimeJwtSecret } from "@/lib/runtime-auth"
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     }
 
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+    const secret = getRuntimeJwtSecret()
 
     const { payload } = await jwtVerify(token, secret)
 
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
       user: {
         id: payload.userId,
         role: payload.role,
+        classificacao: payload.classificacao,
         cpf: payload.cpf,
         usuario_login: payload.usuario_login,
         nome: payload.nome,

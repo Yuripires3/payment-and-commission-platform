@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast"
 import { Pencil, Check, X, Plus, Trash2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { signalPageLoaded } from "@/components/ui/page-loading"
 
 interface UserRow {
   id?: string
@@ -39,6 +40,10 @@ export default function CadastroUsuariosPage() {
       toast({ title: "Erro", description: e instanceof Error ? e.message : "Falha ao carregar usuários", variant: "destructive" })
     } finally {
       setLoading(false)
+      // Sinaliza que a página terminou de carregar
+      requestAnimationFrame(() => {
+        signalPageLoaded()
+      })
     }
   }
 
@@ -131,98 +136,101 @@ export default function CadastroUsuariosPage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando...</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>CPF</TableHead>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Área</TableHead>
-                  <TableHead>Classificação</TableHead>
-                  <TableHead>Nova senha</TableHead>
-                  <TableHead className="w-[140px]">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u, idx) => {
-                  const isEditing = editingId === (u.id ?? "") || (editingId === "new" && idx === 0)
-                  return (
-                  <TableRow key={`${u.id}-${idx}`}>
-                    <TableCell className="min-w-40">
-                      <Input value={u.cpf || ""} disabled={!isEditing} onChange={(e) => {
-                        const v = e.target.value; setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, cpf: v } : x))
-                      }} />
-                    </TableCell>
-                    <TableCell className="min-w-40">
-                      <Input value={u.usuario_login || ""} disabled={!isEditing} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, usuario_login: e.target.value } : x))} />
-                    </TableCell>
-                    <TableCell className="min-w-56">
-                      <Input value={u.nome || ""} disabled={!isEditing} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))} />
-                    </TableCell>
-                    <TableCell className="min-w-56">
-                      <Input type="email" value={u.email || ""} disabled={!isEditing} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, email: e.target.value } : x))} />
-                    </TableCell>
-                    <TableCell className="min-w-40">
-                      <Select value={u.area || ""} onValueChange={(val) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, area: val } : x))} disabled={!isEditing}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a área" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Operacoes">Operacoes</SelectItem>
-                          <SelectItem value="Financeiro">Financeiro</SelectItem>
-                          <SelectItem value="Faturamento">Faturamento</SelectItem>
-                          <SelectItem value="TI">TI</SelectItem>
-                          <SelectItem value="Movimentacao">Movimentacao</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="min-w-40">
-                      <Select value={(u.classificacao || "USUARIO").toString().toUpperCase()} onValueChange={(val) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, classificacao: val } : x))} disabled={!isEditing}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ADMIN">ADMIN</SelectItem>
-                          <SelectItem value="USUARIO">USUARIO</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="min-w-48">
-                      <Input type="password" placeholder={isEditing ? "Preencha para alterar" : ""} disabled={!isEditing} value={u.senha || ""} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, senha: e.target.value } : x))} />
-                    </TableCell>
-                    <TableCell className="space-x-2">
-                      {isEditing ? (
-                        <>
-                          <Button variant="default" size="sm" onClick={() => saveRow(u)}>
-                            <Check className="h-4 w-4 mr-1" /> Salvar
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => cancelEdit(idx)}>
-                            <X className="h-4 w-4 mr-1" /> Cancelar
-                          </Button>
-                          {!(editingId === "new" && idx === 0) && (
-                            <Button variant="destructive" size="icon" onClick={() => deleteRow(u, idx)} title="Excluir">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <Button variant="outline" size="sm" onClick={() => setEditingId(String(u.id ?? ""))} disabled={editingId === "new"} title={editingId === "new" ? "Conclua o cadastro em andamento" : "Editar"}>
-                            <Pencil className="h-4 w-4 mr-1" /> Editar
-                          </Button>
-                          {!(editingId === "new" && idx === 0) && (
-                            <Button variant="destructive" size="icon" onClick={() => deleteRow(u, idx)} title="Excluir">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      )}
-                    </TableCell>
+            <div className="border rounded-md overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>CPF</TableHead>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Área</TableHead>
+                    <TableHead>Classificação</TableHead>
+                    <TableHead>Senha</TableHead>
+                    <TableHead className="w-[140px]">Ações</TableHead>
                   </TableRow>
-                  )})}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u, idx) => {
+                    const isEditing = editingId === (u.id ?? "") || (editingId === "new" && idx === 0)
+                    return (
+                    <TableRow key={`${u.id}-${idx}`}>
+                      <TableCell className="min-w-40">
+                        <Input value={u.cpf || ""} disabled={!isEditing} onChange={(e) => {
+                          const v = e.target.value; setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, cpf: v } : x))
+                        }} />
+                      </TableCell>
+                      <TableCell className="min-w-40">
+                        <Input value={u.usuario_login || ""} disabled={!isEditing} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, usuario_login: e.target.value } : x))} />
+                      </TableCell>
+                      <TableCell className="min-w-56">
+                        <Input value={u.nome || ""} disabled={!isEditing} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, nome: e.target.value } : x))} />
+                      </TableCell>
+                      <TableCell className="min-w-56">
+                        <Input type="email" value={u.email || ""} disabled={!isEditing} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, email: e.target.value } : x))} />
+                      </TableCell>
+                      <TableCell className="min-w-40">
+                        <Select value={u.area || ""} onValueChange={(val) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, area: val } : x))} disabled={!isEditing}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a área" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Operacoes">Operacoes</SelectItem>
+                            <SelectItem value="Financeiro">Financeiro</SelectItem>
+                            <SelectItem value="Faturamento">Faturamento</SelectItem>
+                            <SelectItem value="TI">TI</SelectItem>
+                            <SelectItem value="Movimentacao">Movimentacao</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="min-w-40">
+                        <Select value={(u.classificacao || "USUARIO").toString().toUpperCase()} onValueChange={(val) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, classificacao: val } : x))} disabled={!isEditing}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ADMIN">ADMIN</SelectItem>
+                            <SelectItem value="USUARIO">USUARIO</SelectItem>
+                            <SelectItem value="COMERCIAL">COMERCIAL</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="min-w-48">
+                        <Input type={isEditing ? "password" : "text"} placeholder={isEditing ? "Nova senha (opcional)" : "Hash exibido"} disabled={!isEditing} value={u.senha || ""} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, senha: e.target.value } : x))} />
+                      </TableCell>
+                      <TableCell>
+                        {isEditing ? (
+                          <div className="flex gap-1">
+                            <Button variant="default" size="sm" onClick={() => saveRow(u)}>
+                              <Check className="h-4 w-4 mr-1" /> Salvar
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={() => cancelEdit(idx)}>
+                              <X className="h-4 w-4 mr-1" /> Cancelar
+                            </Button>
+                            {!(editingId === "new" && idx === 0) && (
+                              <Button variant="ghost" size="sm" onClick={() => deleteRow(u, idx)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700" title="Excluir">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => setEditingId(String(u.id ?? ""))} disabled={editingId === "new"} title={editingId === "new" ? "Conclua o cadastro em andamento" : "Editar"}>
+                              <Pencil className="h-4 w-4 mr-1" /> Editar
+                            </Button>
+                            {!(editingId === "new" && idx === 0) && (
+                              <Button variant="ghost" size="sm" onClick={() => deleteRow(u, idx)} className="h-8 w-8 p-0 text-red-600 hover:text-red-700" title="Excluir">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    )})}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

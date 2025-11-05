@@ -1,0 +1,12 @@
+{
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": false,
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__"
+  ],
+  "ignore": [
+    "scripts/calculo_bonificacao_completo.py"
+  ]
+}
+

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection } from "@/lib/db"
 import { hashPassword, validateArea, validateCPF, validateEmail, validatePasswordStrength, validateUsuarioLogin, normalizeCPF } from "@/lib/security"
 import { jwtVerify } from "jose"
+import { getRuntimeJwtSecret } from "@/lib/runtime-auth"
 
 async function requireAdminFromRequest(request: NextRequest) {
   const token = request.cookies.get("token")?.value || request.headers.get("authorization")?.replace("Bearer ", "")
   if (!token) return { ok: false, error: "Não autenticado" }
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+  const secret = getRuntimeJwtSecret()
   try {
     const { payload } = await jwtVerify(token, secret)
     const role = (payload.role as string) || "user"
@@ -43,8 +44,8 @@ export async function POST(request: NextRequest) {
     const passVal = validatePasswordStrength(String(senha || ""))
     if (!passVal.valid) errors.push(...passVal.errors)
 
-    if (classificacao && !["ADMIN", "USER", "USUARIO", "admin", "user", "usuario"].includes(String(classificacao))) {
-      errors.push("Classificação inválida (use ADMIN ou USUARIO)")
+    if (classificacao && !["ADMIN", "USER", "USUARIO", "COMERCIAL", "admin", "user", "usuario", "comercial"].includes(String(classificacao))) {
+      errors.push("Classificação inválida (use ADMIN, USUARIO ou COMERCIAL)")
     }
     if (errors.length) return NextResponse.json({ error: "Erro de validação", details: errors }, { status: 400 })
 
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
   try {
     connection = await getDBConnection()
     const [rows] = await connection.execute(
-      `SELECT id, cpf, nome, email, area, usuario_login, classificacao, data_cadastro, data_alteracao FROM registro_usuarios_web_bonificacao ORDER BY data_cadastro DESC`
+      `SELECT id, cpf, nome, email, area, usuario_login, classificacao, senha, data_cadastro, data_alteracao FROM registro_usuarios_web_bonificacao ORDER BY data_cadastro DESC`
     )
     return NextResponse.json({ users: rows })
   } catch (error) {

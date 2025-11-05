@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection } from "@/lib/db"
 import { hashPassword, validateArea, validateCPF, validateEmail, validatePasswordStrength, validateUsuarioLogin, normalizeCPF } from "@/lib/security"
 import { jwtVerify } from "jose"
+import { getRuntimeJwtSecret } from "@/lib/runtime-auth"
 
 async function requireAdminFromRequest(request: NextRequest) {
   const token = request.cookies.get("token")?.value || request.headers.get("authorization")?.replace("Bearer ", "")
   if (!token) return { ok: false, error: "Não autenticado" }
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET || "your-secret-key-change-in-production")
+  const secret = getRuntimeJwtSecret()
   try {
     const { payload } = await jwtVerify(token, secret)
     const role = (payload.role as string) || "user"
@@ -64,8 +65,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     }
     if (classificacao !== undefined) {
       const raw = String(classificacao).toUpperCase()
+      // Mapeia USUARIO para USER no banco, mas mantém COMERCIAL e ADMIN como estão
       const val = raw === "USUARIO" ? "USER" : raw
-      if (!["ADMIN", "USER"].includes(val)) return NextResponse.json({ error: "Classificação inválida" }, { status: 400 })
+      if (!["ADMIN", "USER", "COMERCIAL"].includes(val)) return NextResponse.json({ error: "Classificação inválida (use ADMIN, USUARIO ou COMERCIAL)" }, { status: 400 })
       updates.push("classificacao = ?"); values.push(val)
     }
     if (senha) {
