@@ -58,5 +58,7 @@ ENV HOST "0.0.0.0"
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:3005/api/health || exit 1
 
+# Iniciar aplicação usando standalone output
+# O server.js está na raiz porque copiamos .next/standalone para ./
 CMD ["node", "server.js"]
 
