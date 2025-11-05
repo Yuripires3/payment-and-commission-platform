@@ -19,6 +19,8 @@ services:
       - HOST=0.0.0.0
       - HOSTNAME=0.0.0.0
       - NEXT_TELEMETRY_DISABLED=1
+      # Desabilitar Turbopack (se necessário em runtime também)
+      - NEXT_USE_TURBOPACK=0
       
       # Variáveis de ambiente do banco de dados MySQL
       # IMPORTANTE: Configure essas variáveis no arquivo .env ou no Coolify

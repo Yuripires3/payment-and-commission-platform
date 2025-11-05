@@ -16,12 +16,18 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copiar código fonte
 COPY . .
 
-# Variáveis de ambiente para build (se necessário)
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NODE_ENV production
+# Variáveis de ambiente para build
+# Aumentar memória para evitar OOM durante o build
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
 
-# Build da aplicação
-RUN npm run build
+# Desabilitar Turbopack no build (pode causar crashes silenciosos)
+# Forçar uso do Webpack tradicional que é mais estável
+ENV NEXT_USE_TURBOPACK=0
+
+# Build da aplicação com output mais verboso
+RUN node -v && npm -v && npm run build
 
 # Stage 3: Runner
 FROM node:20-alpine AS runner

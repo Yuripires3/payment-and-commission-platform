@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Essencial para o Docker standalone funcionar
   output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
@@ -10,7 +11,7 @@ const nextConfig = {
   experimental: {
     turbopackUseSystemTlsCerts: true,
   },
-  // Configuração do Turbopack para silenciar avisos
+  // Configuração do Turbopack para silenciar avisos (se usado)
   turbopack: {},
   // Configuração para permitir cross-origin requests em desenvolvimento
   allowedDevOrigins: ['192.168.113.2', '192.168.1.110', 'http://192.168.1.110:3000'],
