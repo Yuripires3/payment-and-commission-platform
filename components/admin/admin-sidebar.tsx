@@ -21,7 +21,9 @@ import { useState } from "react"
 import { useAuth } from "@/components/auth/auth-provider"
 
 const bonificacoesSubmenu = [
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Regras de Bonificação", href: "/admin/bonificacoes/regras", icon: BookOpen },
+  { label: "Regras de Idade", href: "/admin/bonificacoes/regras-idade", icon: BookOpen },
   { label: "Calcular Bonificação", href: "/admin/bonificacoes/calculo", icon: Calculator },
   { label: "Histórico de Bonificações", href: "/admin/bonificacoes/historico", icon: History },
   { label: "Extrato de Descontos", href: "/admin/bonificacoes/extrato-descontos", icon: Receipt },
@@ -35,13 +37,11 @@ export function AdminSidebar() {
   const pathname = usePathname()
   const { user, logout } = useAuth() as any
   const [isBonificacoesOpen, setIsBonificacoesOpen] = useState(() => 
-    pathname.startsWith("/admin/bonificacoes")
+    pathname.startsWith("/admin/bonificacoes") || pathname === "/admin"
   )
   const [isConfigOpen, setIsConfigOpen] = useState(() =>
     pathname.startsWith("/admin/configuracoes")
   )
-
-  const isBonificacoesActive = pathname.startsWith("/admin/bonificacoes")
 
   return (
     <Sidebar>
@@ -51,27 +51,18 @@ export function AdminSidebar() {
             <span className="text-primary-foreground font-bold text-sm">QV</span>
           </div>
           <div>
-            <h2 className="font-semibold text-sm">Portal de Bonificações</h2>
+            <h2 className="font-semibold text-sm">Portal ARI</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Automações, repasses e indicadores.</p>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarMenu>
-          {/* Dashboard */}
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === "/admin"}>
-              <Link href="/admin">
-                <LayoutDashboard className="h-4 w-4" />
-                <span>Dashboard</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
           {/* Bonificações com Submenu */}
           <SidebarMenuItem>
             <SidebarMenuButton 
-              isActive={pathname.startsWith("/admin/bonificacoes")}
+              isActive={pathname.startsWith("/admin/bonificacoes") || pathname === "/admin"}
               onClick={() => setIsBonificacoesOpen(!isBonificacoesOpen)}
             >
               <Award className="h-4 w-4" />
@@ -82,12 +73,12 @@ export function AdminSidebar() {
               <SidebarMenuSub>
                 {bonificacoesSubmenu
                   .filter((subItem) => {
-                    // Ocultar "Calcular Bonificação" para usuários com classificacao MRKT
+                    // Ocultar "Calcular Bonificação" para usuários com classificacao COMERCIAL
                     if (subItem.href === "/admin/bonificacoes/calculo") {
                       const classificacao = user?.classificacao?.toUpperCase()
                       const role = user?.role?.toUpperCase()
                       // Verificar tanto classificacao quanto role (case-insensitive)
-                      if (classificacao === "MRKT" || role === "MRKT") {
+                      if (classificacao === "COMERCIAL" || role === "COMERCIAL") {
                         return false
                       }
                     }
@@ -112,8 +103,8 @@ export function AdminSidebar() {
 
           {/* Relatórios */}
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === "/admin/reports"}>
-              <Link href="/admin/reports">
+            <SidebarMenuButton asChild isActive={pathname === "/admin/relatorios"}>
+              <Link href="/admin/relatorios">
                 <BarChart3 className="h-4 w-4" />
                 <span>Relatórios</span>
               </Link>

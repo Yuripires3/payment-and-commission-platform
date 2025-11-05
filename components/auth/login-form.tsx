@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { Loader2 } from "lucide-react"
-import Link from "next/link"
 
 export function LoginForm() {
   const [username, setUsername] = useState("")
@@ -59,9 +58,11 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="username">Email ou Usuário</Label>
+        <Label htmlFor="username" className="text-sm font-medium">
+          Email ou Usuário
+        </Label>
         <Input
           id="username"
           type="text"
@@ -69,11 +70,14 @@ export function LoginForm() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
+          className="transition-all duration-200 focus:ring-2 focus:ring-[#184286] focus:border-[#184286]"
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Senha</Label>
+        <Label htmlFor="password" className="text-sm font-medium">
+          Senha
+        </Label>
         <Input
           id="password"
           type="password"
@@ -81,10 +85,24 @@ export function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          className="transition-all duration-200 focus:ring-2 focus:ring-[#184286] focus:border-[#184286]"
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
+      <Button 
+        type="submit" 
+        className="w-full rounded-lg font-semibold text-white shadow-md hover:shadow-lg transition-all duration-300"
+        style={{ 
+          backgroundColor: '#184286',
+        }}
+        disabled={isLoading}
+        onMouseEnter={(e) => {
+          if (!isLoading) e.currentTarget.style.backgroundColor = '#002f67'
+        }}
+        onMouseLeave={(e) => {
+          if (!isLoading) e.currentTarget.style.backgroundColor = '#184286'
+        }}
+      >
         {isLoading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -95,8 +113,18 @@ export function LoginForm() {
         )}
       </Button>
 
-      <div className="text-center text-sm text-muted-foreground">
-        Não tem acesso? Contate o administrador: <a className="underline" href="mailto:ti@qvsaude.com.br">ti@qvsaude.com.br</a>
+      <div className="text-center text-sm text-gray-500 mt-6">
+        Não tem acesso? Contate o administrador:{' '}
+        <a 
+          className="underline font-medium hover:no-underline transition-all duration-200" 
+          style={{ color: '#f58220' }}
+          href="mailto:ti@qvsaude.com.br"
+        >
+          ti@qvsaude.com.br
+        </a>
+      </div>
+      <div className="text-center text-xs text-gray-400 mt-4">
+        Versão 1.0
       </div>
     </form>
   )

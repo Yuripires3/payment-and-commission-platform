@@ -1,0 +1,94 @@
+/**
+ * Helper de permissões baseado na classificação do usuário
+ */
+
+export type UserClassification = "ADMIN" | "USUARIO" | "COMERCIAL" | "admin" | "usuario" | "comercial"
+
+export interface User {
+  classificacao?: UserClassification | string
+  role?: "admin" | "user"
+  id?: string
+  cpf?: string
+  usuario_login?: string
+  nome?: string
+  email?: string
+  area?: string | null
+}
+
+/**
+ * Normaliza a classificação do usuário para maiúsculas
+ */
+export function normalizeClassification(user: User | null | undefined): UserClassification | null {
+  if (!user) return null
+  
+  // Prioriza classificacao sobre role
+  const classification = user.classificacao || user.role
+  if (!classification) return null
+  
+  const normalized = String(classification).toUpperCase()
+  
+  // Mapeia role para classificacao se necessário
+  if (normalized === "ADMIN") {
+    return "ADMIN"
+  } else if (normalized === "USER" || normalized === "USUARIO") {
+    return "USUARIO"
+  } else if (normalized === "COMERCIAL") {
+    return "COMERCIAL"
+  }
+  
+  // Fallback: assume USUARIO se não reconhecer
+  return normalized as UserClassification || "USUARIO"
+}
+
+/**
+ * Verifica se o usuário pode editar regras (ADMIN ou USUARIO)
+ */
+export function canEditRules(user: User | null | undefined): boolean {
+  const classification = normalizeClassification(user)
+  return classification === "ADMIN" || classification === "USUARIO"
+}
+
+/**
+ * Verifica se o usuário pode cadastrar regras (ADMIN ou USUARIO)
+ */
+export function canCreateRules(user: User | null | undefined): boolean {
+  return canEditRules(user)
+}
+
+/**
+ * Verifica se o usuário pode excluir regras (ADMIN ou USUARIO)
+ */
+export function canDeleteRules(user: User | null | undefined): boolean {
+  return canEditRules(user)
+}
+
+/**
+ * Verifica se o usuário pode importar regras em lote (ADMIN ou USUARIO)
+ */
+export function canImportRules(user: User | null | undefined): boolean {
+  return canEditRules(user)
+}
+
+/**
+ * Verifica se o usuário pode visualizar regras (todos podem)
+ */
+export function canViewRules(user: User | null | undefined): boolean {
+  return true // Todos podem visualizar
+}
+
+/**
+ * Verifica se o usuário é ADMIN
+ */
+export function isAdmin(user: User | null | undefined): boolean {
+  const classification = normalizeClassification(user)
+  return classification === "ADMIN"
+}
+
+/**
+ * Verifica se o usuário é COMERCIAL (apenas visualização)
+ */
+export function isCOMERCIAL(user: User | null | undefined): boolean {
+  const classification = normalizeClassification(user)
+  return classification === "COMERCIAL"
+}
+

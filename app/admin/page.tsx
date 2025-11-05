@@ -23,6 +23,7 @@ import {
   Bar,
   LineChart,
   Line,
+  ComposedChart,
   PieChart,
   Pie,
   Cell,
@@ -31,7 +32,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  LabelList
 } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -123,6 +125,13 @@ type ItemRank = { nome: string; papel?: string; valor: number; valorBruto?: numb
 type DistribuicaoOperadora = { operadora: string; valor: number; percentual: number }
 type StatusMensal = { mes: string; status: string; valor: number }
 type ImpactoDescontos = { mes: string; valorDesconto: number; valorProducao: number; percentualDesconto: number }
+type EvolucaoDescontos = { 
+  mes: string; 
+  descontosRealizados: number; 
+  cancelamentos: number; 
+  saldoBanco?: number;
+  cancelamentosDetalhes?: Array<{ valor: number; data: string }>
+}
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -133,14 +142,16 @@ export default function DashboardPage() {
   const [dataInicio, setDataInicio] = useState(() => {
     const param = searchParams.get("inicio")
     if (param) return param
-    // Padrão: 30 dias atrás a partir da data fim
-    const dataFim = new Date()
-    const thirtyDaysAgo = new Date(dataFim)
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    return thirtyDaysAgo.toISOString().split("T")[0]
+    // Padrão: primeiro dia do mês atual
+    const hoje = new Date()
+    const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+    return primeiroDiaMes.toISOString().split("T")[0]
   })
   const [dataFim, setDataFim] = useState(() => {
-    return searchParams.get("fim") || new Date().toISOString().split("T")[0]
+    const param = searchParams.get("fim")
+    if (param) return param
+    // Padrão: data do dia atual
+    return new Date().toISOString().split("T")[0]
   })
   const [operadora, setOperadora] = useState(searchParams.get("operadora") || "")
   const [entidades, setEntidades] = useState<string[]>(() => {
@@ -160,6 +171,7 @@ export default function DashboardPage() {
   const [porOperadora, setPorOperadora] = useState<DistribuicaoOperadora[]>([])
   const [statusMensal, setStatusMensal] = useState<StatusMensal[]>([])
   const [impactoDescontos, setImpactoDescontos] = useState<ImpactoDescontos[]>([])
+  const [evolucaoDescontos, setEvolucaoDescontos] = useState<EvolucaoDescontos[]>([])
 
   // Estados de filtros disponíveis
   const [operadorasDisponiveis, setOperadorasDisponiveis] = useState<string[]>([])
@@ -219,50 +231,112 @@ export default function DashboardPage() {
       if (operadora) params.append("operadora", operadora)
       if (entidades.length > 0) params.append("entidade", entidades.join(","))
 
+      // Verificar se o range é maior que 12 meses (calcular diretamente)
+      const dataInicioDate = new Date(dataInicio)
+      const dataFimDate = new Date(dataFim)
+      const diffTime = dataFimDate.getTime() - dataInicioDate.getTime()
+      const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44) // Média de dias por mês
+      const rangeGreaterThan12Months = diffMonths > 12
+
       // Carregar todos os dados em paralelo
       // As tabelas de top 10 sempre mostram corretores e supervisores separados (ignoram filtro de papel)
       const paramsTopFixos = new URLSearchParams(params)
       paramsTopFixos.delete('papel') // Remove papel para top tables - sempre mostram ambos separados
+      paramsTopFixos.set('limit', '10') // Garantir que sempre retorne 10 itens
       
-      const [kpisRes, evolucaoRes, topCorretoresRes, topSupervisoresRes, porEntidadeRes, porOperadoraRes, statusMensalRes, impactoRes] = await Promise.all([
+      // Se range > 12 meses, não carregar os 3 gráficos específicos aqui (serão carregados depois)
+      const promises = [
         fetch(`/api/dashboard/kpis?${params}`),
-        fetch(`/api/dashboard/evolucao?${params}`),
         fetch(`/api/dashboard/top-corretores?${paramsTopFixos}`),
         fetch(`/api/dashboard/top-supervisores?${paramsTopFixos}`),
         fetch(`/api/dashboard/por-entidade?${params}`),
         fetch(`/api/dashboard/por-operadora?${params}`),
-        fetch(`/api/dashboard/status-mensal?${params}`),
-        fetch(`/api/dashboard/impacto-descontos?${params}`)
-      ])
+        fetch(`/api/dashboard/status-mensal?${params}`)
+      ]
 
-      if (!kpisRes.ok) throw new Error("Erro ao carregar KPIs")
-      if (!evolucaoRes.ok) throw new Error("Erro ao carregar evolução")
-      if (!topCorretoresRes.ok) throw new Error("Erro ao carregar top corretores")
-      if (!topSupervisoresRes.ok) throw new Error("Erro ao carregar top supervisores")
-      if (!porEntidadeRes.ok) throw new Error("Erro ao carregar por entidade")
-      if (!porOperadoraRes.ok) throw new Error("Erro ao carregar por operadora")
-      if (!statusMensalRes.ok) throw new Error("Erro ao carregar status mensal")
-      if (!impactoRes.ok) throw new Error("Erro ao carregar impacto de descontos")
+      if (!rangeGreaterThan12Months) {
+        // Se range <= 12 meses, carregar todos os gráficos normalmente
+        promises.push(
+          fetch(`/api/dashboard/evolucao?${params}`),
+          fetch(`/api/dashboard/impacto-descontos?${params}`),
+          fetch(`/api/dashboard/evolucao-descontos?${params}`)
+        )
+      }
 
-      const [kpisData, evolucaoData, topCorretoresData, topSupervisoresData, porEntidadeData, porOperadoraData, statusMensalData, impactoData] = await Promise.all([
-        kpisRes.json(),
-        evolucaoRes.json(),
-        topCorretoresRes.json(),
-        topSupervisoresRes.json(),
-        porEntidadeRes.json(),
-        porOperadoraRes.json(),
-        statusMensalRes.json(),
-        impactoRes.json()
+      const results = await Promise.all(promises)
+
+      if (!results[0].ok) throw new Error("Erro ao carregar KPIs")
+      if (!results[1].ok) throw new Error("Erro ao carregar top corretores")
+      if (!results[2].ok) throw new Error("Erro ao carregar top supervisores")
+      if (!results[3].ok) throw new Error("Erro ao carregar por entidade")
+      if (!results[4].ok) throw new Error("Erro ao carregar por operadora")
+      if (!results[5].ok) throw new Error("Erro ao carregar status mensal")
+
+      const [kpisData, topCorretoresData, topSupervisoresData, porEntidadeData, porOperadoraData, statusMensalData, evolucaoData, impactoData, evolucaoDescontosData] = await Promise.all([
+        results[0].json(),
+        results[1].json(),
+        results[2].json(),
+        results[3].json(),
+        results[4].json(),
+        results[5].json(),
+        !rangeGreaterThan12Months ? results[6].json() : Promise.resolve([]),
+        !rangeGreaterThan12Months ? results[7].json() : Promise.resolve([]),
+        !rangeGreaterThan12Months ? results[8].json() : Promise.resolve([])
       ])
 
       setKpis(kpisData)
-      setEvolucao(evolucaoData)
       setTopCorretores(topCorretoresData)
       setTopSupervisores(topSupervisoresData)
       setPorEntidade(porEntidadeData)
       setPorOperadora(porOperadoraData)
       setStatusMensal(statusMensalData)
-      setImpactoDescontos(impactoData)
+      
+      if (!rangeGreaterThan12Months) {
+        setEvolucao(evolucaoData)
+        setImpactoDescontos(impactoData)
+        setEvolucaoDescontos(evolucaoDescontosData)
+      } else {
+        // Se range > 12 meses, carregar os gráficos específicos imediatamente após carregar o dashboard
+        // Usar setTimeout para garantir que o estado foi atualizado
+        setTimeout(async () => {
+          try {
+            const chartParams = new URLSearchParams({
+              inicio: dataInicio,
+              fim: dataFim,
+              papel: papel
+            })
+            if (operadora) chartParams.append("operadora", operadora)
+            if (entidades.length > 0) chartParams.append("entidade", entidades.join(","))
+
+            const [evolucaoRes, impactoRes, evolucaoDescontosRes] = await Promise.all([
+              fetch(`/api/dashboard/evolucao?${chartParams}`),
+              fetch(`/api/dashboard/impacto-descontos?${chartParams}`),
+              fetch(`/api/dashboard/evolucao-descontos?${chartParams}`)
+            ])
+
+            if (!evolucaoRes.ok) throw new Error("Erro ao carregar evolução")
+            if (!impactoRes.ok) throw new Error("Erro ao carregar impacto de descontos")
+            if (!evolucaoDescontosRes.ok) throw new Error("Erro ao carregar evolução de descontos")
+
+            const [evolucaoData, impactoData, evolucaoDescontosData] = await Promise.all([
+              evolucaoRes.json(),
+              impactoRes.json(),
+              evolucaoDescontosRes.json()
+            ])
+
+            setEvolucao(evolucaoData)
+            setImpactoDescontos(impactoData)
+            setEvolucaoDescontos(evolucaoDescontosData)
+          } catch (error: any) {
+            console.error("Erro ao carregar gráficos específicos:", error)
+            toast({
+              title: "Erro",
+              description: error.message || "Não foi possível atualizar os gráficos",
+              variant: "destructive"
+            })
+          }
+        }, 100)
+      }
     } catch (error: any) {
       console.error("Erro ao carregar dashboard:", error)
       // Garantir que os estados sejam arrays vazios em caso de erro
@@ -278,10 +352,90 @@ export default function DashboardPage() {
     }
   }, [dataInicio, dataFim, operadora, entidades, papel, toast])
 
+  // Função para verificar se o range é maior que 12 meses (contando a partir da data fim)
+  const isRangeGreaterThan12Months = useCallback((inicio: string, fim: string): boolean => {
+    if (!inicio || !fim) return false
+    
+    const dataInicio = new Date(inicio)
+    const dataFim = new Date(fim)
+    
+    // Calcular diferença em meses (contando da data fim)
+    const diffTime = dataFim.getTime() - dataInicio.getTime()
+    const diffMonths = diffTime / (1000 * 60 * 60 * 24 * 30.44) // Média de dias por mês
+    
+    return diffMonths > 12
+  }, [])
+
+  // Função para carregar apenas os gráficos específicos quando range > 12 meses
+  const loadSpecificCharts = useCallback(async () => {
+    if (!dataInicio || !dataFim) return
+
+    try {
+      const params = new URLSearchParams({
+        inicio: dataInicio,
+        fim: dataFim,
+        papel: papel
+      })
+      if (operadora) params.append("operadora", operadora)
+      if (entidades.length > 0) params.append("entidade", entidades.join(","))
+
+      // Carregar apenas os três gráficos específicos
+      const [evolucaoRes, impactoRes, evolucaoDescontosRes] = await Promise.all([
+        fetch(`/api/dashboard/evolucao?${params}`),
+        fetch(`/api/dashboard/impacto-descontos?${params}`),
+        fetch(`/api/dashboard/evolucao-descontos?${params}`)
+      ])
+
+      if (!evolucaoRes.ok) throw new Error("Erro ao carregar evolução")
+      if (!impactoRes.ok) throw new Error("Erro ao carregar impacto de descontos")
+      if (!evolucaoDescontosRes.ok) throw new Error("Erro ao carregar evolução de descontos")
+
+      const [evolucaoData, impactoData, evolucaoDescontosData] = await Promise.all([
+        evolucaoRes.json(),
+        impactoRes.json(),
+        evolucaoDescontosRes.json()
+      ])
+
+      setEvolucao(evolucaoData)
+      setImpactoDescontos(impactoData)
+      setEvolucaoDescontos(evolucaoDescontosData)
+    } catch (error: any) {
+      console.error("Erro ao carregar gráficos específicos:", error)
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível atualizar os gráficos",
+        variant: "destructive"
+      })
+    }
+  }, [dataInicio, dataFim, operadora, entidades, papel, toast])
+
   // Carregar dados quando filtros mudarem
   useEffect(() => {
     loadDashboard()
   }, [loadDashboard])
+
+  // Atualizar gráficos específicos quando range > 12 meses (após carregamento inicial)
+  useEffect(() => {
+    if (!dataInicio || !dataFim) return
+    
+    // Verificar se o range é maior que 12 meses
+    if (!isRangeGreaterThan12Months(dataInicio, dataFim)) {
+      return
+    }
+    
+    // Se ainda está carregando, aguardar terminar
+    if (loading) {
+      return
+    }
+    
+    // Aguardar um pequeno delay para garantir que loadDashboard terminou completamente
+    // e então atualizar apenas os três gráficos específicos
+    const timer = setTimeout(() => {
+      loadSpecificCharts()
+    }, 300)
+    
+    return () => clearTimeout(timer)
+  }, [dataFim, dataInicio, loading, isRangeGreaterThan12Months, loadSpecificCharts])
 
   // Atualizar URL quando papel mudar
   useEffect(() => {
@@ -435,7 +589,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Card className="bg-white rounded-2xl shadow-sm border-zinc-200/70">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Comissões do Mês</CardTitle>
+            <CardTitle className="text-sm font-medium">Bonificações do Mês</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -522,8 +676,8 @@ export default function DashboardPage() {
       {/* Evolução de Comissões */}
       <Card className="bg-white rounded-2xl shadow-sm border-zinc-200/70">
         <CardHeader>
-          <CardTitle>Evolução de Comissões</CardTitle>
-          <CardDescription>Últimos 12 meses - Comissões líquidas e descontos</CardDescription>
+          <CardTitle>Evolução de Bonificações</CardTitle>
+          <CardDescription>Últimos 12 meses - Bonificações líquidas e descontos</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -535,10 +689,7 @@ export default function DashboardPage() {
               <BarChart data={evolucao.map(item => ({ ...item, mes: fmtMes(item.mes) }))}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="mes" />
-                <YAxis tickFormatter={(value) => {
-                  const formatted = fmtBRL(value)
-                  return formatted.replace('R$', '').trim()
-                }} />
+                <YAxis tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
                 <Tooltip 
                   content={({ active, payload }) => {
                     if (!active || !payload || payload.length === 0) return null
@@ -622,9 +773,9 @@ export default function DashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={porEntidade.slice(0, 10)} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis 
                     type="number" 
+                    hide={true}
                     tickFormatter={(value) => {
                       const formatted = fmtBRL(value)
                       return formatted.replace('R$', '').trim()
@@ -875,7 +1026,7 @@ export default function DashboardPage() {
       {/* Impacto de Descontos */}
       <Card className="bg-white rounded-2xl shadow-sm border-zinc-200/70">
         <CardHeader>
-          <CardTitle>Impacto de Descontos</CardTitle>
+          <CardTitle>Impacto dos Descontos</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -932,6 +1083,152 @@ export default function DashboardPage() {
                   name="% Desconto"
                 />
               </LineChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Evolução de Descontos - Modelo Cascata */}
+      <Card className="bg-white rounded-2xl shadow-sm border-zinc-200/70">
+        <CardHeader>
+          <CardTitle>Evolução de Descontos</CardTitle>
+          <CardDescription>Últimos 12 meses - Descontos realizados, cancelamentos e saldo acumulado</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : evolucaoDescontos.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={(() => {
+                // Usar saldoBanco retornado pela API (já calculado corretamente com saldo histórico)
+                return evolucaoDescontos.map((item, index) => {
+                  const mes = fmtMes(item.mes)
+                  const cancelamentos = item.cancelamentos || 0
+                  const descontosRealizados = item.descontosRealizados || 0
+                  
+                  // Usar saldoBanco da API que já contém o saldo acumulado correto
+                  const saldoTotal = item.saldoBanco || 0
+                  
+                  // Para o gráfico cascata, precisamos calcular o saldo anterior para mostrar os componentes
+                  // O saldo anterior é o saldo do mês anterior (ou calculado para o primeiro mês)
+                  const saldoAnterior = index > 0 
+                    ? (evolucaoDescontos[index - 1].saldoBanco || 0)
+                    : (saldoTotal - descontosRealizados + cancelamentos)
+                  
+                  // Componentes da barra cascata:
+                  // - Base: saldo anterior (já acumulado até o mês anterior)
+                  // - Cancelamentos: valores que reduzem o saldo (mostrados como valores negativos no empilhamento)
+                  // - Descontos: valores positivos que aumentam o saldo
+                  // - Resultado final: saldoTotal = base - cancelamentos + descontos
+                  
+                  // Para o Recharts, precisamos calcular valores intermediários:
+                  // Após cancelamentos: saldoAnterior - cancelamentos
+                  // Após descontos: saldoAnterior - cancelamentos + descontos = saldoTotal
+                  
+                  const saldoAposCancelamentos = Math.max(0, saldoAnterior - cancelamentos)
+                  
+                  return {
+                    mes,
+                    base: Math.max(0, saldoAnterior), // Base não pode ser negativa
+                    cancelamentos: saldoAnterior - saldoAposCancelamentos, // Diferença (sempre positiva para exibição)
+                    descontosRealizados: descontosRealizados,
+                    saldoTotal: saldoTotal, // Este é o valor final acumulado
+                    cancelamentosDetalhes: item.cancelamentosDetalhes || [] // Detalhes dos cancelamentos do mês
+                  }
+                })
+              })()}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="mes" />
+                <YAxis tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} reversed />
+                <Tooltip 
+                  content={({ active, payload }) => {
+                    if (!active || !payload || payload.length === 0) return null
+                    
+                    // Pegar os dados do payload
+                    const data = payload[0].payload as any
+                    
+                    // Extrair valores do payload para garantir precisão
+                    let cancelamentos = Math.abs(data.cancelamentos || 0)
+                    let descontosRealizados = data.descontosRealizados || 0
+                    let saldoTotal = data.saldoTotal || 0
+                    
+                    // Se os valores vierem dos payloads individuais, usar eles
+                    payload.forEach((entry: any) => {
+                      if (entry.dataKey === "cancelamentos" && entry.value !== undefined) {
+                        cancelamentos = Math.abs(entry.value)
+                      } else if (entry.dataKey === "descontosRealizados" && entry.value !== undefined) {
+                        descontosRealizados = entry.value
+                      } else if (entry.dataKey === "saldoTotal" && entry.value !== undefined) {
+                        saldoTotal = entry.value
+                      }
+                    })
+                    
+                    // Buscar detalhes dos cancelamentos do mês e calcular o total consolidado
+                    const cancelamentosDetalhes = data.cancelamentosDetalhes || []
+                    // Se houver detalhes, somar todos. Caso contrário, usar o valor do mês da API
+                    // Para isso, precisamos buscar o item original do evolucaoDescontos
+                    const mesAtual = data.mes
+                    const itemOriginal = evolucaoDescontos.find((item: any) => fmtMes(item.mes) === mesAtual)
+                    const cancelamentosMes = cancelamentosDetalhes.length > 0
+                      ? cancelamentosDetalhes.reduce((sum: number, det: any) => sum + (det.valor || 0), 0)
+                      : (itemOriginal?.cancelamentos || 0) // Se não houver detalhes, usar o valor do mês
+
+                    return (
+                      <div className="bg-white dark:bg-zinc-900 p-3 border rounded-lg shadow-lg max-w-md">
+                        <p className="font-semibold mb-2">{data.mes}</p>
+                        <p className="text-sm mb-1">
+                          <span style={{ color: "#CA8282" }}>Cancelamentos:</span> {fmtBRL(cancelamentos)}
+                        </p>
+                        {cancelamentosMes > 0 && (
+                          <p className="text-sm mb-1 ml-2">
+                            <span className="text-gray-600 dark:text-gray-400">Cancelado no mês:</span> {fmtBRL(cancelamentosMes)}
+                          </p>
+                        )}
+                        {descontosRealizados > 0 && (
+                          <p className="text-sm mb-1">
+                            <span style={{ color: "#f58220" }}>Descontos Realizados:</span> {fmtBRL(descontosRealizados)}
+                          </p>
+                        )}
+                        <p className="text-sm font-semibold">
+                          <span style={{ color: COLORS_QV.azulEscuro }}>Saldo Total (a descontar):</span> {fmtBRL(saldoTotal)}
+                        </p>
+                      </div>
+                    )
+                  }}
+                />
+                <Legend />
+                {/* Base: saldo anterior (invisível mas necessário para o empilhamento correto) */}
+                {evolucaoDescontos.length > 0 && (
+                  <Bar 
+                    dataKey="base" 
+                    stackId="1" 
+                    fill="transparent"
+                    hide={true}
+                    name=""
+                    legendType="none"
+                  />
+                )}
+                {/* Cancelamentos: valores negativos que reduzem o saldo */}
+                {evolucaoDescontos.length > 0 && (
+                  <Bar 
+                    dataKey="cancelamentos" 
+                    name="Cancelamentos" 
+                    stackId="1" 
+                    fill="#CA8282"
+                  />
+                )}
+                {/* Descontos realizados: valores positivos que aumentam o saldo */}
+                {evolucaoDescontos.length > 0 && (
+                  <Bar 
+                    dataKey="descontosRealizados" 
+                    name="Descontos Realizados" 
+                    stackId="1" 
+                    fill="#f58220"
+                  />
+                )}
+              </BarChart>
             </ResponsiveContainer>
           )}
         </CardContent>

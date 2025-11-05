@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
     const passVal = validatePasswordStrength(String(senha || ""))
     if (!passVal.valid) errors.push(...passVal.errors)
 
-    if (classificacao && !["ADMIN", "USER", "USUARIO", "MRKT", "admin", "user", "usuario", "mrkt"].includes(String(classificacao))) {
-      errors.push("Classificação inválida (use ADMIN, USUARIO ou MRKT)")
+    if (classificacao && !["ADMIN", "USER", "USUARIO", "COMERCIAL", "admin", "user", "usuario", "comercial"].includes(String(classificacao))) {
+      errors.push("Classificação inválida (use ADMIN, USUARIO ou COMERCIAL)")
     }
     if (errors.length) return NextResponse.json({ error: "Erro de validação", details: errors }, { status: 400 })
 
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
   try {
     connection = await getDBConnection()
     const [rows] = await connection.execute(
-      `SELECT id, cpf, nome, email, area, usuario_login, classificacao, data_cadastro, data_alteracao FROM registro_usuarios_web_bonificacao ORDER BY data_cadastro DESC`
+      `SELECT id, cpf, nome, email, area, usuario_login, classificacao, senha, data_cadastro, data_alteracao FROM registro_usuarios_web_bonificacao ORDER BY data_cadastro DESC`
     )
     return NextResponse.json({ users: rows })
   } catch (error) {

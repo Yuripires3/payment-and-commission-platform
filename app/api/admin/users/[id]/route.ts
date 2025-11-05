@@ -65,9 +65,9 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     }
     if (classificacao !== undefined) {
       const raw = String(classificacao).toUpperCase()
-      // Mapeia USUARIO para USER no banco, mas mantém MRKT e ADMIN como estão
+      // Mapeia USUARIO para USER no banco, mas mantém COMERCIAL e ADMIN como estão
       const val = raw === "USUARIO" ? "USER" : raw
-      if (!["ADMIN", "USER", "MRKT"].includes(val)) return NextResponse.json({ error: "Classificação inválida (use ADMIN, USUARIO ou MRKT)" }, { status: 400 })
+      if (!["ADMIN", "USER", "COMERCIAL"].includes(val)) return NextResponse.json({ error: "Classificação inválida (use ADMIN, USUARIO ou COMERCIAL)" }, { status: 400 })
       updates.push("classificacao = ?"); values.push(val)
     }
     if (senha) {

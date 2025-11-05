@@ -146,7 +146,7 @@ export default function CadastroUsuariosPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Área</TableHead>
                     <TableHead>Classificação</TableHead>
-                    <TableHead>Nova senha</TableHead>
+                    <TableHead>Senha</TableHead>
                     <TableHead className="w-[140px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -191,12 +191,12 @@ export default function CadastroUsuariosPage() {
                           <SelectContent>
                             <SelectItem value="ADMIN">ADMIN</SelectItem>
                             <SelectItem value="USUARIO">USUARIO</SelectItem>
-                            <SelectItem value="MRKT">MRKT</SelectItem>
+                            <SelectItem value="COMERCIAL">COMERCIAL</SelectItem>
                           </SelectContent>
                         </Select>
                       </TableCell>
                       <TableCell className="min-w-48">
-                        <Input type="password" placeholder={isEditing ? "Preencha para alterar" : ""} disabled={!isEditing} value={u.senha || ""} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, senha: e.target.value } : x))} />
+                        <Input type={isEditing ? "password" : "text"} placeholder={isEditing ? "Nova senha (opcional)" : "Hash exibido"} disabled={!isEditing} value={u.senha || ""} onChange={(e) => setUsers((arr) => arr.map((x, i) => i === idx ? { ...x, senha: e.target.value } : x))} />
                       </TableCell>
                       <TableCell>
                         {isEditing ? (

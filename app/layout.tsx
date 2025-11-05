@@ -10,8 +10,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Plataforma de Comissões B2B",
-  description: "Sistema completo de gestão de comissões, bonificações e pagamentos",
+  title: "Portal da Automação",
+  description: "Equilíbrio e transparência.",
   generator: "v0.app",
 }
 
@@ -24,6 +24,7 @@ export default function RootLayout({
     <html lang="pt-BR">
       <head>
         <meta charSet="UTF-8" />
+        <link rel="icon" href="/favicon.png" />
       </head>
       <body className={`font-sans antialiased bg-background text-foreground`}>
         <AuthProvider>

@@ -58,12 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isLoading) return
 
     const isAdminRoute = pathname?.startsWith("/admin")
-    const isPartnerRoute = pathname?.startsWith("/partner")
     const isLoginRoute = pathname === "/login"
     const isRegisterRoute = pathname === "/register"
     const isPublicRoute = pathname === "/"
 
-    if (!user && (isAdminRoute || isPartnerRoute)) {
+    if (!user && isAdminRoute) {
       // Not logged in, trying to access protected route
       console.log("[Auth] Not authenticated, redirecting to login")
       router.push("/login")
