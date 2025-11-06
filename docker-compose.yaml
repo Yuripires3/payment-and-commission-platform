@@ -30,7 +30,7 @@ services:
       # Opções:
       # - Se na mesma rede privada: use "sql" ou "192.168.1.193"
       # - Se precisa de acesso externo: configure IP público ou hostname no Coolify
-      - DB_HOST=${DB_HOST:-sql}
+      - DB_HOST=${DB_HOST:-201.76.177.134}
       - DB_PORT=${DB_PORT:-3306}
       - DB_USER=${DB_USER:-Indicadores}
       - DB_PASSWORD=${DB_PASSWORD:-xEth+vOHltr*c4Eju3+t}
@@ -44,7 +44,7 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:3005"]
       interval: 20s
       timeout: 5s
-      retries: 5
+      retries: 4
       start_period: 25s
 
     # Início do servidor
