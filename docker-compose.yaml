@@ -9,40 +9,50 @@ services:
     container_name: payment-and-commission-platform
     restart: always
 
-    # Mapeamento de portas - mantido em 3005
+    # Mapeamento de portas - mantém 3005 para acessar via IP:PORTA
     ports:
       - "3005:3005"
 
     environment:
-      - NODE_ENV=production
-      - PORT=3005
-      - HOST=0.0.0.0
-      # Removido HOSTNAME=0.0.0.0 (isso só confunde o Node)
-      # Define o IP real ou domínio público do servidor:
-      - PUBLIC_HOST=http://82.25.66.17:3005
-      - NEXT_PUBLIC_SITE_URL=http://82.25.66.17:3005
-      - NEXT_TELEMETRY_DISABLED=1
-      - NEXT_USE_TURBOPACK=0
+      # Execução Next.js/Node
+      NODE_ENV: production
+      PORT: "3005"
+      HOST: "0.0.0.0"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_USE_TURBOPACK: "0"
 
-      # Banco de dados
-      - DB_HOST=${DB_HOST:-192.168.1.193}
-      - DB_PORT=${DB_PORT:-3306}
-      - DB_USER=${DB_USER:-Indicadores}
-      - DB_PASSWORD=${DB_PASSWORD:-xEth+vOHltr*c4Eju3+t}
-      - DB_NAME=${DB_NAME:-indicadores}
+      # URL pública (use IP real + porta)
+      PUBLIC_HOST: "http://82.25.66.17:3005"
+      NEXT_PUBLIC_SITE_URL: "http://82.25.66.17:3005"
 
+      # Banco de dados (evite defaults aqui; deixe no .env)
+      DB_HOST: "${DB_HOST}"
+      DB_PORT: "${DB_PORT}"
+      DB_USER: "${DB_USER}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+      DB_NAME: "${DB_NAME}"
+
+      # Opcional: aumentar timeout de conexão do driver (em ms, depende da lib)
+      # DB_CONNECT_TIMEOUT: "15000"
+
+    # Carrega variáveis do .env (terão precedência se não forem sobrescritas acima)
     env_file:
       - .env
 
-    # Healthcheck - apontando para uma rota válida do Next.js
+    # Healthcheck: use Node (sempre existe) em vez de curl/wget (podem não existir na imagem)
+    # Tente apontar para uma rota que retorne 200 (ex.: /api/health). Ajuste se necessário.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3005"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://localhost:3005/api/health', r => process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""
+        ]
       interval: 20s
       timeout: 5s
       retries: 5
       start_period: 25s
 
-    # Início do servidor
+    # Início do servidor (confira se este arquivo realmente inicia seu Next)
     command: node server-start.js
 
     labels:
