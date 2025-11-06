@@ -37,10 +37,10 @@ export async function getDBConnection() {
   }
   
   // Adicionar timeout maior para conexões remotas
+  // NOTA: acquireTimeout não é válido para createConnection(), apenas para createPool()
   const connectionConfig = {
     ...config,
     connectTimeout: 30000, // 30 segundos
-    acquireTimeout: 30000,
   }
   
   return await mysql.createConnection(connectionConfig)

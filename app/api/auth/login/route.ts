@@ -115,12 +115,20 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     )
 
+    // Configurar cookie de autenticação
+    // IMPORTANTE: secure deve ser false para HTTP (não HTTPS)
+    // Se usar HTTPS, defina NEXTAUTH_URL com https:// ou use variável de ambiente
+    const isSecure = process.env.NEXTAUTH_URL?.startsWith("https://") || 
+                     process.env.PUBLIC_HOST?.startsWith("https://") ||
+                     false
+    
     response.cookies.set("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecure, // false para HTTP, true para HTTPS
       sameSite: "lax",
       maxAge: 60 * 60 * 24, // 24 hours
       path: "/",
+      // Não definir domain para permitir que funcione em qualquer subdomínio/IP
     })
 
     return response
