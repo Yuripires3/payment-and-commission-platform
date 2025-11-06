@@ -205,6 +205,93 @@ curl http://<IP_SERVIDOR>:3005/api/health
 - [x] Healthcheck configurado
 - [x] Variáveis de ambiente sem senhas hardcoded
 
+## Troubleshooting: Erro "Docker Compose file not found"
+
+### Erro: `Docker Compose file not found at: /docker-compose.yaml`
+
+Este erro ocorre quando o Coolify procura o arquivo no caminho errado. Aqui estão as soluções:
+
+#### Solução 1: Verificar Configuração do Coolify
+
+1. **No painel do Coolify**, vá para as configurações do seu aplicativo
+2. Verifique a seção **"Docker Compose"** ou **"Build Settings"**
+3. Certifique-se de que o **"Docker Compose File Path"** está configurado como:
+   - `docker-compose.yaml` (caminho relativo à raiz do repositório)
+   - OU deixe em branco (o Coolify detectará automaticamente)
+
+#### Solução 2: Verificar Estrutura do Repositório
+
+O arquivo `docker-compose.yaml` **deve estar na raiz do repositório Git**:
+
+```
+payment-and-commission-platform/
+├── docker-compose.yaml  ← Deve estar aqui
+├── Dockerfile
+├── package.json
+└── ...
+```
+
+#### Solução 3: Configurar Caminho no Coolify
+
+Se o Coolify não detectar automaticamente:
+
+1. No Coolify, vá em **Settings** → **Docker Compose**
+2. Configure o campo **"Docker Compose File"**:
+   ```
+   docker-compose.yaml
+   ```
+   (sem barra inicial, caminho relativo)
+
+#### Solução 4: Usar docker-compose.yml (alternativa)
+
+Alguns sistemas preferem `.yml` ao invés de `.yaml`:
+
+```bash
+# Renomear o arquivo (opcional)
+mv docker-compose.yaml docker-compose.yml
+```
+
+**Nota**: O Docker Compose aceita ambos os formatos, mas alguns sistemas podem ter preferência.
+
+#### Solução 5: Verificar Permissões e Commit
+
+Certifique-se de que:
+
+1. O arquivo está commitado no Git:
+   ```bash
+   git add docker-compose.yaml
+   git commit -m "Add docker-compose.yaml"
+   git push
+   ```
+
+2. O arquivo não está no `.gitignore`:
+   ```bash
+   # Verificar se não está ignorado
+   git check-ignore docker-compose.yaml
+   # Não deve retornar nada
+   ```
+
+#### Solução 6: Usar Dockerfile ao invés de Compose (alternativa)
+
+Se o problema persistir, você pode configurar o Coolify para usar apenas o `Dockerfile`:
+
+1. No Coolify, desabilite "Docker Compose"
+2. Configure para usar apenas o `Dockerfile`
+3. Configure as variáveis de ambiente manualmente no painel
+
+### Verificação Rápida
+
+Execute no servidor do Coolify (se tiver acesso SSH):
+
+```bash
+# Verificar se o arquivo existe no repositório clonado
+cd /data/coolify/.../seu-projeto
+ls -la docker-compose.yaml
+
+# Verificar conteúdo
+cat docker-compose.yaml
+```
+
 ## Conclusão
 
 O `docker-compose.yaml` está configurado corretamente para:
@@ -214,4 +301,6 @@ O `docker-compose.yaml` está configurado corretamente para:
 - Funcionar corretamente com o Coolify
 
 O script `server-start.js` complementa a configuração ao fazer o patch do `os.hostname()` e interceptar os logs para substituir o hostname pelo IP real.
+
+**Importante**: Se o erro persistir, verifique as configurações do Coolify e certifique-se de que o arquivo está na raiz do repositório e foi commitado corretamente.
 
