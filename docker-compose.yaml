@@ -5,90 +5,54 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Não usar args aqui - segredos devem estar apenas em runtime
-    
+
     container_name: payment-and-commission-platform
     restart: always
-    
-    # Mapeamento de portas: expõe a porta do container para o host
-    # Formato: "HOST_PORT:CONTAINER_PORT"
-    # IMPORTANTE: Use 3000 ou 3005 conforme disponibilidade
-    # O Coolify detecta automaticamente a porta mapeada
-    # Para usar porta 3005, altere para: "3005:3005" e ajuste PORT=3005 abaixo
+
+    # Mapeamento de portas - mantido em 3005
     ports:
       - "3005:3005"
-    
-    # Não definir hostname explicitamente - deixa o Docker gerar automaticamente
-    # Isso evita que o hostname do container apareça nos logs do Next.js
-    # O server-start.js irá substituir o hostname pelo IP real nos logs
-    
+
     environment:
-      # Variáveis de ambiente da aplicação
       - NODE_ENV=production
-      # PORT: Use 3000 ou 3005 conforme disponibilidade
-      # O Coolify pode sobrescrever isso via variáveis de ambiente
-      # IMPORTANTE: A porta aqui deve corresponder ao mapeamento acima
-      - PORT=${PORT:-3005}
-      # HOST=0.0.0.0 faz o servidor escutar em todas as interfaces
-      # CRÍTICO: Sem isso, o servidor só escuta em localhost e não é acessível externamente
+      - PORT=3005
       - HOST=0.0.0.0
-      - HOSTNAME=0.0.0.0
-      # PUBLIC_HOST: URL pública da aplicação (IP:porta ou domínio)
-      # O server-start.js usa isso para mostrar a URL correta nos logs
-      # Formato: IP:porta (ex: 192.168.1.100:3005) ou URL completa (ex: http://192.168.1.100:3005)
-      # Se não definido, o script tentará detectar automaticamente o IP
-      # No Coolify, defina esta variável com o IP do servidor: PUBLIC_HOST=192.168.X.X:3005
-      - PUBLIC_HOST=${PUBLIC_HOST:-}
-      # NEXT_PUBLIC_SITE_URL: Alternativa ao PUBLIC_HOST (padrão Next.js)
-      # Se ambos estiverem definidos, NEXT_PUBLIC_SITE_URL tem prioridade
-      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-}
+      # Removido HOSTNAME=0.0.0.0 (isso só confunde o Node)
+      # Define o IP real ou domínio público do servidor:
+      - PUBLIC_HOST=http://192.168.1.193:3005
+      - NEXT_PUBLIC_SITE_URL=http://192.168.1.193:3005
       - NEXT_TELEMETRY_DISABLED=1
-      # Desabilitar Turbopack (se necessário em runtime também)
       - NEXT_USE_TURBOPACK=0
-      
-      # Variáveis de ambiente do banco de dados MySQL
-      # IMPORTANTE: Configure essas variáveis no arquivo .env ou no Coolify
-      # NUNCA coloque senhas diretamente aqui - use variáveis de ambiente
+
+      # Banco de dados
       - DB_HOST=${DB_HOST:-192.168.1.193}
       - DB_PORT=${DB_PORT:-3306}
       - DB_USER=${DB_USER:-Indicadores}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME:-indicadores}
-    
-    # Arquivo .env (opcional, para desenvolvimento local)
-    # No Coolify, configure as variáveis diretamente no painel
-    # O env_file é ignorado se a variável já estiver definida no environment
+
     env_file:
       - .env
-    
-    # Health check - verifica se a aplicação está respondendo
-    # IMPORTANTE: A porta deve corresponder à PORT definida nas variáveis de ambiente
-    # Se usar PORT=3005, altere para "http://localhost:3005/api/health"
+
+    # Healthcheck - apontando para uma rota válida do Next.js
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3005/api/health"]
-      interval: 15s
+      test: ["CMD", "curl", "-f", "http://localhost:3005"]
+      interval: 20s
       timeout: 5s
       retries: 5
-      start_period: 20s
-    
-    # Comando para iniciar o servidor Next.js standalone
-    # O server-start.js usa PUBLIC_HOST ou NEXT_PUBLIC_SITE_URL para mostrar URL correta nos logs
-    # IMPORTANTE: Não tenta mais patchear os.hostname() (incompatível com Node 20)
+      start_period: 25s
+
+    # Início do servidor
     command: node server-start.js
-    
-    # Labels para o Coolify (opcional, mas ajuda na identificação)
+
     labels:
       - "coolify.managed=true"
       - "coolify.service=app"
-    
-    # Rede bridge - permite acesso externo via IP do servidor
-    # IMPORTANTE: Não usar network_mode: bridge junto com networks:
-    # São mutuamente exclusivos. Usar networks: é mais flexível
+
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
-    # Bridge permite que containers se comuniquem e sejam acessíveis externamente
-    # via IP do host quando as portas estão mapeadas
+    
