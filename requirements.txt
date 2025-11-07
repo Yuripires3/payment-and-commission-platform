@@ -7,4 +7,5 @@ openpyxl
 requests
 python-dateutil
 tzlocal
+elasticsearch==8.15.1
 
