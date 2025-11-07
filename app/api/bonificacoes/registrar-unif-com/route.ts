@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection } from "@/lib/db"
+import { formatDateISO } from "@/lib/date-utils"
 
 interface RegistrarUnifComRequest {
   exec_id: string
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
     //            premiacao, tipo_premiado, mes_apurado, apuracao, obs, dt_pagamento, dt_registro, dt_envio
     let registrosInseridos = 0
 
+    const hojeIso = formatDateISO(new Date())
+
     for (const unif of data) {
       try {
         await connection.execute(
@@ -69,9 +72,9 @@ export async function POST(request: NextRequest) {
             unif.mes_apurado || null,
             unif.apuracao || null,
             unif.obs || null,
-            unif.dt_pagamento || null,
-            unif.dt_registro || new Date().toISOString().split('T')[0],
-            unif.dt_envio || new Date().toISOString().split('T')[0]
+            unif.dt_pagamento ? formatDateISO(unif.dt_pagamento) : null,
+            unif.dt_registro ? formatDateISO(unif.dt_registro) : hojeIso,
+            unif.dt_envio ? formatDateISO(unif.dt_envio) : hojeIso
           ]
         )
         registrosInseridos++

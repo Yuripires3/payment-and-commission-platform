@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection } from "@/lib/db"
+import { formatDateISO } from "@/lib/date-utils"
 
 /**
  * GET /api/dashboard/filtros
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     )
 
     const ultimaDataStr = ultimaData[0]?.ultima_data 
-      ? new Date(ultimaData[0].ultima_data).toISOString().split('T')[0]
+      ? formatDateISO(ultimaData[0].ultima_data)
       : null
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 # Stage 1: Dependencies
 FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat tzdata
+ENV TZ=America/Sao_Paulo
 WORKDIR /app
 
 # Copiar arquivos de dependências
@@ -10,6 +11,9 @@ RUN npm ci
 # Stage 2: Builder
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+RUN apk add --no-cache tzdata
+ENV TZ=America/Sao_Paulo
 
 # Copiar dependências do stage anterior
 COPY --from=deps /app/node_modules ./node_modules
@@ -35,9 +39,11 @@ WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV TZ America/Sao_Paulo
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN apk add --no-cache tzdata && \
+    addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 # Instalar curl para health check (precisa ser antes de trocar para usuário não-root)
 RUN apk add --no-cache curl

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import mysql from "mysql2/promise"
+import { getDBConnection } from "@/lib/db"
+import { formatDateISO } from "@/lib/date-utils"
 
 // Converte para YYYY-MM-DD (sem hora) - garante formato correto para MySQL DATE
 function toSQLDate(date: any): string | null {
@@ -13,8 +14,8 @@ function toSQLDate(date: any): string | null {
   const d = new Date(date)
   if (isNaN(d.getTime())) return null
   
-  // Garante YYYY-MM-DD usando toISOString().split("T")[0]
-  return d.toISOString().split("T")[0]
+  // Garante YYYY-MM-DD usando formatação consistente
+  return formatDateISO(d) || null
 }
 
 // Converte valores numéricos
@@ -49,14 +50,7 @@ export async function PUT(
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      charset: 'utf8mb4'
-    })
+    connection = await getDBConnection()
     
     // Garantir charset UTF-8 na conexão
     await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
@@ -209,14 +203,7 @@ export async function DELETE(
       )
     }
 
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      charset: 'utf8mb4'
-    })
+    connection = await getDBConnection()
     
     await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
     await connection.execute("SET CHARACTER SET utf8mb4")

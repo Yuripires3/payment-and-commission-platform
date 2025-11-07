@@ -15,6 +15,7 @@ import { signalPageLoaded } from "@/components/ui/page-loading"
 import { formatCurrency } from "@/utils/bonificacao"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import { formatDateBR, formatDateISO, getDateParts } from "@/lib/date-utils"
 
 interface HistoricoData {
   id?: number
@@ -381,32 +382,16 @@ export default function HistoricoBonificacoesPage() {
     setPage(1)
   }
   
-  // Função para formatar data no formato dd/MM/yyyy
-  const formatDateBR = (dateString: string | null | undefined): string => {
-    if (!dateString) return ""
-    try {
-      const date = new Date(dateString)
-      const day = String(date.getDate()).padStart(2, '0')
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const year = date.getFullYear()
-      return `${day}/${month}/${year}`
-    } catch {
-      return dateString
-    }
-  }
-  
   // Função para formatar mês no formato MMM/yy
   const formatMonthBR = (dateString: string | null | undefined): string => {
     if (!dateString) return ""
-    try {
-      const date = new Date(dateString)
-      const monthIndex = date.getMonth()
-      const year = String(date.getFullYear()).slice(-2)
-      const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
-      return `${meses[monthIndex]}/${year}`
-    } catch {
-      return ""
-    }
+    const parts = getDateParts(dateString)
+    if (!parts) return ""
+    const monthIndex = parts.month - 1
+    if (monthIndex < 0 || monthIndex > 11) return ""
+    const meses = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+    const year = String(parts.year).slice(-2)
+    return `${meses[monthIndex]}/${year}`
   }
   
   // Função para calcular dataPagamento - 1 dia (ou -3 se for segunda-feira para pegar a sexta anterior)
@@ -474,7 +459,7 @@ export default function HistoricoBonificacoesPage() {
       if (filters.dt_pagamento_inicio) {
         allData = allData.filter(item => {
           if (!item.dt_pagamento) return false
-          const itemDate = new Date(item.dt_pagamento).toISOString().split('T')[0]
+          const itemDate = formatDateISO(item.dt_pagamento)
           return itemDate === filters.dt_pagamento_inicio
         })
       }
@@ -503,7 +488,7 @@ export default function HistoricoBonificacoesPage() {
               if (filters.dt_pagamento_inicio) {
                 pageData = pageData.filter((item: HistoricoData) => {
                   if (!item.dt_pagamento) return false
-                  const itemDate = new Date(item.dt_pagamento).toISOString().split('T')[0]
+                  const itemDate = formatDateISO(item.dt_pagamento)
                   return itemDate === filters.dt_pagamento_inicio
                 })
               }
@@ -785,7 +770,7 @@ export default function HistoricoBonificacoesPage() {
         obs: obsFormatted,
         dt_pagamento: formData.dt_pagamento 
           ? (formData.dt_pagamento.includes('T') 
-              ? new Date(formData.dt_pagamento).toISOString().split('T')[0]
+              ? formatDateISO(formData.dt_pagamento)
               : formData.dt_pagamento)
           : null
       }
@@ -902,15 +887,7 @@ export default function HistoricoBonificacoesPage() {
       // Manter como string se for string, ou número se for número
       premiacao: row.premiacao != null ? (typeof row.premiacao === 'string' ? String(row.premiacao) : (typeof row.premiacao === 'number' ? row.premiacao : null)) : null,
       // Data: garantir formato YYYY-MM-DD para input date
-      dt_pagamento: row.dt_pagamento ? (() => {
-        try {
-          const date = new Date(row.dt_pagamento)
-          if (isNaN(date.getTime())) return null
-          return date.toISOString().split('T')[0]
-        } catch {
-          return null
-        }
-      })() : null
+      dt_pagamento: row.dt_pagamento ? formatDateISO(row.dt_pagamento) || null : null
     }
     
     setEditingRow(row.id)
@@ -989,14 +966,10 @@ export default function HistoricoBonificacoesPage() {
     setEditedData(prev => ({ ...prev, [field]: value }))
   }
 
-  const formatDate = (date: string | null | undefined) => {
+  const formatDate = (date: string | Date | null | undefined) => {
     if (!date) return ""
-    try {
-      const d = new Date(date)
-      return d.toLocaleDateString("pt-BR")
-    } catch {
-      return date
-    }
+    const formatted = formatDateBR(date)
+    return formatted || (typeof date === "string" ? date : "")
   }
 
   return (

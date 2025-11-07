@@ -17,6 +17,8 @@ services:
       - NODE_ENV=production
       - PORT=3005
       - HOST=0.0.0.0
+      - TZ=America/Sao_Paulo
+      - APP_TIMEZONE=America/Sao_Paulo
       # Removido HOSTNAME=0.0.0.0 (isso só confunde o Node)
       # Define o IP real ou domínio público do servidor:
       - PUBLIC_HOST=http://82.25.66.17:3005

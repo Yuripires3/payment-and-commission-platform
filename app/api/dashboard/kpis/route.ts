@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
 import { construirCampoValorPorData, construirFiltroPapel } from "@/lib/dashboard-helpers"
+import { formatDateISO } from "@/lib/date-utils"
 
 /**
  * GET /api/dashboard/kpis
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
     // Mês anterior
     const dataInicioMesAnterior = new Date(anoAtual, mesAtual - 2, 1)
     const inicioMesAnterior = `${dataInicioMesAnterior.getFullYear()}-${String(dataInicioMesAnterior.getMonth() + 1).padStart(2, "0")}-01`
-    const fimMesAnterior = new Date(anoAtual, mesAtual - 1, 0).toISOString().split("T")[0]
+    const fimMesAnterior = formatDateISO(new Date(anoAtual, mesAtual - 1, 0))
 
     // Construir WHERE para mês atual
     const whereMesAtualConditions = [...whereConditions]

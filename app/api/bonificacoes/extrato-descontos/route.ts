@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import mysql from "mysql2/promise"
+import { getDBConnection } from "@/lib/db"
+import { formatDateTimeLocal } from "@/lib/date-utils"
 
 export async function GET(request: NextRequest) {
   let connection: any = null
@@ -14,13 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
 
     // Extrair parâmetros
     const searchParams = request.nextUrl.searchParams
@@ -167,13 +162,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
 
     const body = await request.json()
     const { 
@@ -211,7 +200,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Data/hora de registro
-    const registro = new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const registro = formatDateTimeLocal(new Date())
 
     // Inserir registro
     const [result]: any = await connection.execute(

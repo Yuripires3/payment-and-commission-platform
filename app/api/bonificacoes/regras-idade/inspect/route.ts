@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import mysql from "mysql2/promise"
+import { getDBConnection } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   let connection: any = null
@@ -12,14 +12,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      charset: 'utf8mb4'
-    })
+    connection = await getDBConnection()
     
     await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
     await connection.execute("SET CHARACTER SET utf8mb4")

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection } from "@/lib/db"
+import { formatDateTimeLocal, formatDateISO } from "@/lib/date-utils"
 
 interface RegistrarUnifBonifRequest {
   exec_id: string
@@ -43,11 +44,11 @@ export async function POST(request: NextRequest) {
             vlr_bruto_supervisor, dt_registro, descontado, dt_analise, chave_id)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            unif.dt_pagamento || null,
+            unif.dt_pagamento ? formatDateISO(unif.dt_pagamento) : null,
             unif.operadora || null,
             unif.entidade || null,
             unif.numero_proposta || null,
-            unif.dt_inicio_vigencia || null,
+            unif.dt_inicio_vigencia ? formatDateISO(unif.dt_inicio_vigencia) : null,
             unif.cpf || null,
             unif.nome || null,
             unif.tipo_beneficiario || null,
@@ -62,9 +63,9 @@ export async function POST(request: NextRequest) {
             unif.cpf_supervisor || null,
             unif.nome_supervisor || null,
             unif.vlr_bruto_supervisor || null,
-            unif.dt_registro || new Date().toISOString().slice(0, 19).replace('T', ' '),
+            formatDateTimeLocal(unif.dt_registro || new Date()),
             unif.descontado || 0,
-            unif.dt_analise || null,
+            unif.dt_analise ? formatDateISO(unif.dt_analise) : null,
             unif.chave_id || null
           ]
         )

@@ -21,6 +21,7 @@ import { signalPageLoaded } from "@/components/ui/page-loading"
 import { Progress } from "@/components/ui/progress"
 import { ConfiguracaoExecucaoCard } from "./_components/ConfiguracaoExecucaoCard"
 import { useAuth } from "@/components/auth/auth-provider"
+import { formatDateBR, formatDateISO } from "@/lib/date-utils"
 
 interface Indicadores {
   vlr_bruto_total: string
@@ -912,7 +913,7 @@ export default function CalculoBonificacaoPage() {
           // Tentar converter de ISO string para formato YYYY-MM-DD
           const dataPagamentoDate = new Date(dataPagamentoStr)
           if (!isNaN(dataPagamentoDate.getTime())) {
-            dataMovimentacaoParaArmazenar = dataPagamentoDate.toISOString().split('T')[0]
+            dataMovimentacaoParaArmazenar = formatDateISO(dataPagamentoDate)
             console.log(`[CALCULO] Data de movimentação (dt_pagamento) capturada do resultado: ${dataMovimentacaoParaArmazenar}`)
           } else {
             console.warn(`[CALCULO] Erro ao converter data_pagamento: ${dataPagamentoStr}`)
@@ -1103,7 +1104,7 @@ export default function CalculoBonificacaoPage() {
           
           const dataPagamentoDate = new Date(dataPagamentoStr)
           if (!isNaN(dataPagamentoDate.getTime())) {
-            dataMovimentacaoParaExcluir = dataPagamentoDate.toISOString().split('T')[0]
+            dataMovimentacaoParaExcluir = formatDateISO(dataPagamentoDate)
             console.log(`[CANCELAR] Data extraída do resultado: ${dataMovimentacaoParaExcluir}`)
           }
         }
@@ -1115,7 +1116,7 @@ export default function CalculoBonificacaoPage() {
             const dtPagamentoStr = primeiraLinha.dt_pagamento
             const dtPagamentoDate = new Date(dtPagamentoStr)
             if (!isNaN(dtPagamentoDate.getTime())) {
-              dataMovimentacaoParaExcluir = dtPagamentoDate.toISOString().split('T')[0]
+              dataMovimentacaoParaExcluir = formatDateISO(dtPagamentoDate)
               console.log(`[CANCELAR] Data extraída de unif_bonif: ${dataMovimentacaoParaExcluir}`)
             }
           }
@@ -1409,44 +1410,20 @@ export default function CalculoBonificacaoPage() {
   // Função para formatar data para exibição (apenas data, formato pt-BR)
   const formatDateDisplay = (value: any): string => {
     if (!value) return ''
-    try {
-      const date = new Date(value)
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString("pt-BR")
-      }
-      return String(value || '')
-    } catch {
-      return String(value || '')
-    }
+    const formatted = formatDateBR(value)
+    return formatted || String(value || '')
   }
 
   // Função para formatar data para input type="date" (YYYY-MM-DD)
   const formatDateForInput = (value: any): string => {
     if (!value) return ''
-    try {
-      const date = new Date(value)
-      if (!isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0]
-      }
-      return ''
-    } catch {
-      return ''
-    }
+    return formatDateISO(value)
   }
 
   // Função para converter valor de input date para formato de banco
   const parseDateInput = (value: string): string => {
     if (!value) return ''
-    try {
-      const date = new Date(value)
-      if (!isNaN(date.getTime())) {
-        // Retornar apenas a data (YYYY-MM-DD) sem hora
-        return date.toISOString().split('T')[0]
-      }
-      return value
-    } catch {
-      return value
-    }
+    return formatDateISO(value) || value
   }
 
   // Função para formatar nomes de filtros
@@ -1546,7 +1523,7 @@ export default function CalculoBonificacaoPage() {
       .toUpperCase()
   }
 
-  const hojeStr = new Date().toISOString().split("T")[0]
+  const hojeStr = formatDateISO(new Date())
 
   return (
     <div className="w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">

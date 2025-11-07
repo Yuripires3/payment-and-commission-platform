@@ -11,6 +11,7 @@ import { RegrasIdadeTable } from "./_components/RegrasIdadeTable"
 import { Plus, X } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
 import { canCreateRules, canImportRules, canEditRules } from "@/lib/permissions"
+import { formatDateISO } from "@/lib/date-utils"
 
 export const OPERADORAS = [
   "UNIMED RIO",
@@ -272,7 +273,7 @@ export default function RegrasIdadePage() {
         const epoch = new Date(Date.UTC(1899, 11, 30))
         const ms = epoch.getTime() + Math.round(val) * 24 * 60 * 60 * 1000
         const d = new Date(ms)
-        if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+        if (!Number.isNaN(d.getTime())) return formatDateISO(d)
       }
       let s = String(val).trim()
       // Remover sinais/formatos estranhos ex.: "+045658-01"
@@ -305,7 +306,7 @@ export default function RegrasIdadePage() {
           const epoch = new Date(Date.UTC(1899, 11, 30))
           const ms = epoch.getTime() + Math.round(serial) * 24 * 60 * 60 * 1000
           const d = new Date(ms)
-          if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+          if (!Number.isNaN(d.getTime())) return formatDateISO(d)
         }
       }
       // 8 dígitos: tentar AAAAMMDD ou DDMMAAAA
@@ -324,7 +325,7 @@ export default function RegrasIdadePage() {
       }
       // Fallback: tentar Date.parse
       const d = new Date(s)
-      if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
+      if (!Number.isNaN(d.getTime())) return formatDateISO(d)
       return s
     }
     // Operadora: manter valor original do arquivo, apenas normalizar se houver correspondência exata (case-insensitive)

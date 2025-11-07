@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import mysql from "mysql2/promise"
+import { getDBConnection } from "@/lib/db"
 
 export async function PUT(
   request: NextRequest,
@@ -63,13 +63,7 @@ export async function PUT(
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
 
     // Verificar se o registro existe
     const [rows]: any = await connection.execute(
@@ -148,13 +142,7 @@ export async function DELETE(
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
 
     // Verificar se o registro existe
     const [rows]: any = await connection.execute(

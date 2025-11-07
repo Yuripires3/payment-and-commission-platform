@@ -36,6 +36,7 @@ import {
   LabelList
 } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { formatDateISO } from "@/lib/date-utils"
 
 // Cores QV (paleta conforme especificado)
 const COLORS_QV = {
@@ -145,13 +146,13 @@ export default function DashboardContent() {
     // Padrão: primeiro dia do mês atual
     const hoje = new Date()
     const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-    return primeiroDiaMes.toISOString().split("T")[0]
+    return formatDateISO(primeiroDiaMes)
   })
   const [dataFim, setDataFim] = useState(() => {
     const param = searchParams.get("fim")
     if (param) return param
     // Padrão: data do dia atual
-    return new Date().toISOString().split("T")[0]
+    return formatDateISO(new Date())
   })
   const [operadora, setOperadora] = useState(searchParams.get("operadora") || "")
   const [entidades, setEntidades] = useState<string[]>(() => {

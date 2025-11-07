@@ -1,16 +1,7 @@
-import mysql from "mysql2/promise"
 import { NextRequest, NextResponse } from "next/server"
 import { buildChaveKey } from "@/utils/bonificacao"
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST!,
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER!,
-  password: process.env.DB_PASSWORD!,
-  database: process.env.DB_NAME!,
-  connectionLimit: 10,
-  charset: "utf8mb4",
-})
+import { getDBConnection } from "@/lib/db"
+import { formatDateISO } from "@/lib/date-utils"
 
 // Converte para YYYY-MM-DD (sem hora) - garante formato correto para MySQL DATE
 function toSQLDate(date: any): string | null {
@@ -24,8 +15,8 @@ function toSQLDate(date: any): string | null {
   const d = new Date(date)
   if (isNaN(d.getTime())) return null
   
-  // Garante YYYY-MM-DD usando toISOString().split("T")[0]
-  return d.toISOString().split("T")[0]
+  // Garante YYYY-MM-DD usando formatação consistente
+  return formatDateISO(d) || null
 }
 
 // Converte valores decimais com vírgula/ponto para número real
@@ -53,6 +44,7 @@ export async function PUT(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  let connection: any = null
   try {
     const body = await req.json().catch(() => ({}))
     
@@ -69,8 +61,13 @@ export async function PUT(
     console.log("ID:", id)
     console.log("Body:", JSON.stringify(body, null, 2))
 
+    connection = await getDBConnection()
+    await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
+    await connection.execute("SET CHARACTER SET utf8mb4")
+    await connection.execute("SET character_set_connection=utf8mb4")
+
     // Buscar registro atual do banco para obter todos os campos (não apenas os editados)
-    const [currentRows] = await pool.execute(
+    const [currentRows] = await connection.execute(
       "SELECT * FROM registro_bonificacao_valores_v2 WHERE id = ?",
       [id]
     )
@@ -151,7 +148,7 @@ export async function PUT(
     console.log("SQL:", sql)
     console.log("Values:", values)
 
-    const [result] = await pool.execute(sql, values)
+    const [result] = await connection.execute(sql, values)
 
     console.log("Update result:", result)
 
@@ -160,6 +157,12 @@ export async function PUT(
     console.error("Erro:", e)
     // devolve texto legível para o client
     return NextResponse.json({ error: e?.message || "Erro inesperado" }, { status: 500 })
+  } finally {
+    if (connection) {
+      try {
+        await connection.end()
+      } catch (error) {}
+    }
   }
 }
 
@@ -167,6 +170,7 @@ export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  let connection: any = null
   try {
     console.log("DELETE request received")
     
@@ -188,7 +192,12 @@ export async function DELETE(
 
     console.log("Deleting record with ID:", id)
 
-    const [result] = await pool.execute(
+    connection = await getDBConnection()
+    await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
+    await connection.execute("SET CHARACTER SET utf8mb4")
+    await connection.execute("SET character_set_connection=utf8mb4")
+
+    const [result] = await connection.execute(
       "DELETE FROM registro_bonificacao_valores_v2 WHERE id = ?",
       [id]
     )
@@ -199,5 +208,11 @@ export async function DELETE(
   } catch (e: any) {
     console.error("Erro ao excluir:", e)
     return NextResponse.json({ error: e?.message || "Erro inesperado" }, { status: 500 })
+  } finally {
+    if (connection) {
+      try {
+        await connection.end()
+      } catch (error) {}
+    }
   }
 }

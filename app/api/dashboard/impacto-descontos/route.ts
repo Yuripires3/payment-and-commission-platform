@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
 import { construirCampoValorPorData, construirFiltroPapel } from "@/lib/dashboard-helpers"
+import { formatDateISO } from "@/lib/date-utils"
 
 /**
  * GET /api/dashboard/impacto-descontos
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
       if (diffMonths < 12) {
         const dataInicioAjustada = new Date(dataFimObj)
         dataInicioAjustada.setMonth(dataInicioAjustada.getMonth() - 12)
-        inicioCalculado = dataInicioAjustada.toISOString().split('T')[0]
+        inicioCalculado = formatDateISO(dataInicioAjustada)
       } else {
         inicioCalculado = inicio
       }
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       // Se não fornecido, calcular 12 meses antes de fim
       const dataInicioObj = new Date(dataFimObj)
       dataInicioObj.setMonth(dataInicioObj.getMonth() - 12)
-      inicioCalculado = dataInicioObj.toISOString().split('T')[0]
+      inicioCalculado = formatDateISO(dataInicioObj)
     }
 
     // Construir WHERE clause para pagamentos

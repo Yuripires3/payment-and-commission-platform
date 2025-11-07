@@ -11,6 +11,7 @@ import { OPERADORAS, TIPOS_FAIXA, PRODUTOS, PAGAMENTO_POR, TIPO_BENEFICIARIO, PA
 import { Download, Search, ChevronLeft, ChevronRight, X, Pencil, Check, XCircle, Trash2, Loader2, Circle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { signalPageLoaded } from "@/components/ui/page-loading"
+import { formatDateISO } from "@/lib/date-utils"
 
 // Interface dinâmica para suportar todas as colunas do banco
 interface RegraData {
@@ -789,7 +790,7 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
           try {
             const date = new Date(newValue)
             if (!isNaN(date.getTime())) {
-              normalizedValue = date.toISOString().split('T')[0] // YYYY-MM-DD
+              normalizedValue = formatDateISO(date)
             }
           } catch (e) {
             console.error("Error normalizing date:", e)
@@ -976,7 +977,7 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `regras_idade_${new Date().toISOString().split("T")[0]}.csv`)
+    link.setAttribute("download", `regras_idade_${formatDateISO(new Date())}.csv`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
@@ -1287,7 +1288,7 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
                                     try {
                                       const date = new Date(editedData[key])
                                       if (!isNaN(date.getTime())) {
-                                        return date.toISOString().split('T')[0]
+                                        return formatDateISO(date)
                                       }
                                       return ''
                                     } catch {
@@ -1300,7 +1301,7 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
                                       try {
                                         const date = new Date(value)
                                         if (!isNaN(date.getTime())) {
-                                          handleCellChange(key, date.toISOString())
+                                          handleCellChange(key, formatDateISO(date))
                                         }
                                       } catch {
                                         handleCellChange(key, value)

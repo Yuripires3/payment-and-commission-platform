@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import mysql from "mysql2/promise"
+import { getDBConnection } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   let connection: any = null
@@ -14,13 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
 
     // Extrair parâmetro de busca
     const searchParams = request.nextUrl.searchParams

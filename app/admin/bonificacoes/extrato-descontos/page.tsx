@@ -13,6 +13,7 @@ import { useAuth } from "@/components/auth/auth-provider"
 import { canCreateRules, canDeleteRules } from "@/lib/permissions"
 import { signalPageLoaded } from "@/components/ui/page-loading"
 import { formatCurrency } from "@/utils/bonificacao"
+import { formatDateBR, formatDateISO } from "@/lib/date-utils"
 
 interface ExtratoDescontosData {
   dt_apuracao?: string
@@ -308,14 +309,10 @@ export default function ExtratoDescontosPage() {
     }
   }
 
-  const formatDate = (date: string | null | undefined) => {
+  const formatDate = (date: string | Date | null | undefined) => {
     if (!date) return ""
-    try {
-      const d = new Date(date)
-      return d.toLocaleDateString("pt-BR")
-    } catch {
-      return date
-    }
+    const formatted = formatDateBR(date)
+    return formatted || (typeof date === "string" ? date : "")
   }
 
   // Carrega a lib XLSX via CDN (evita problemas de módulo não encontrado no Next.js)
@@ -650,7 +647,7 @@ export default function ExtratoDescontosPage() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      const dateStr = new Date().toISOString().split("T")[0]
+      const dateStr = formatDateISO(new Date())
       link.download = `extrato_descontos_${dateStr}.xlsx`
       link.style.visibility = "hidden"
       document.body.appendChild(link)

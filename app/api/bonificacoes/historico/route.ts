@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import mysql from "mysql2/promise"
+import { getDBConnection } from "@/lib/db"
 
 export async function GET(request: NextRequest) {
   let connection: any = null
@@ -21,13 +21,7 @@ export async function GET(request: NextRequest) {
     if (action === "getTiposPremiado" || action === "getTiposCartao" || action === "getPremiacoes" || action === "getTiposPremiacao") {
       let tiposConnection: any = null
       try {
-        tiposConnection = await mysql.createConnection({
-          host: process.env.DB_HOST,
-          port: Number(process.env.DB_PORT || 3306),
-          user: process.env.DB_USER,
-          password: process.env.DB_PASSWORD,
-          database: process.env.DB_NAME,
-        })
+        tiposConnection = await getDBConnection()
         
         // Para premiacao, precisamos converter para string pois pode ser numérico
         if (action === "getPremiacoes") {
@@ -75,13 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
     
     const cpf = searchParams.get("cpf")
     const nome = searchParams.get("nome")
@@ -260,13 +248,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Criar conexão
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      port: Number(process.env.DB_PORT || 3306),
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-    })
+    connection = await getDBConnection()
 
     // Inserir registro
     const [result]: any = await connection.execute(
