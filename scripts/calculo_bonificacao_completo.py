@@ -1039,7 +1039,7 @@ def main():
                                            x['entidade_nova'], x['plano_novo'], x['vigencia']), axis=1
             )
             
-            CUT = pd.Timestamp('2025-10-20')
+            CUT = pd.Timestamp('2025-11-20')
             mask = (
                 (df2['operadora'] == 'NOVA SAUDE') &
                 (df2['vigencia'] <= CUT) &
