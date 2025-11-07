@@ -284,7 +284,13 @@ export async function POST(request: NextRequest) {
       })
       
       // Se o script não existir ou falhar, retornar erro estruturado
-      if (error.code === "ENOENT" || error.message?.includes("python") || error.message?.includes("Python")) {
+      const erroScriptInexistente =
+        error.code === "ENOENT" ||
+        error.message?.includes("ENOENT") ||
+        /no such file or directory/i.test(error.message || "") ||
+        /can't open file/i.test(stderr || "")
+
+      if (erroScriptInexistente) {
         return NextResponse.json({
           exec_id,
           sucesso: false,
