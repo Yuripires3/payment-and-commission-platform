@@ -40,9 +40,6 @@ docs
 # Migrations (se não for necessário no build)
 migrations
 
-# Scripts Python (se não for necessário no build)
-scripts
-
 # Logs
 logs
 *.log
