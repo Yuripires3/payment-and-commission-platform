@@ -3,7 +3,15 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Pacotes necessários para scripts Python e healthcheck
-RUN apk add --no-cache python3 py3-pip curl
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl \
+    build-base \
+    mariadb-dev \
+    python3-dev \
+    libffi-dev \
+    openssl-dev
 
 # Instala dependências do Node primeiro para aproveitar cache
 COPY package.json package-lock.json* ./
