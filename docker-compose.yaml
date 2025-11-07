@@ -13,6 +13,13 @@ services:
     ports:
       - "3005:3005"
 
+    # Garante que o código (incluindo scripts Python) fique disponível dentro do container
+    volumes:
+      - .:/app
+
+    # Define o diretório de trabalho padrão para todos os comandos/execs
+    working_dir: /app
+
     environment:
       - NODE_ENV=production
       - PORT=3005
@@ -43,7 +50,7 @@ services:
 
     # Healthcheck - apontando para uma rota válida do Next.js
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3005"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3005 || exit 1"]
       interval: 20s
       timeout: 5s
       retries: 4
