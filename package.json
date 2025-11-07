@@ -6,6 +6,7 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
+    "postbuild": "node scripts/postbuild-fix-standalone.js",
     "start": "node .next/standalone/server.js"
   },
   "dependencies": {
