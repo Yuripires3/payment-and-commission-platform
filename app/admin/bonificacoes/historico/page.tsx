@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, X, Trash2, ChevronLeft, ChevronRight, XCircle, Pencil, Check, FileDown } from "lucide-react"
+import { Plus, X, Trash2, ChevronLeft, ChevronRight, XCircle, Pencil, Check, Download, Loader2 } from "lucide-react"
 import { useAuth } from "@/components/auth/auth-provider"
-import { canCreateRules, canDeleteRules, canEditRules } from "@/lib/permissions"
+import { canCreateRules, canDeleteRules, canEditRules, normalizeClassification } from "@/lib/permissions"
 import { signalPageLoaded } from "@/components/ui/page-loading"
 import { formatCurrency } from "@/utils/bonificacao"
 import jsPDF from "jspdf"
@@ -29,6 +29,8 @@ interface HistoricoData {
   mes_apurado?: string
   obs?: string
   dt_pagamento?: string
+  chave_pix?: string | null
+  tipo_chave?: string | null
 }
 
 const formatCpf = (cpf: string | null | undefined): string => {
@@ -107,6 +109,9 @@ export default function HistoricoBonificacoesPage() {
   })
   
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [generatingPedidoE, setGeneratingPedidoE] = useState(false)
+  const userClassification = normalizeClassification(user)
+  const canGeneratePedidoE = userClassification === "ADMIN" || userClassification === "USUARIO"
 
   // Tipos de premiado disponíveis
   const [tiposPremiado, setTiposPremiado] = useState<string[]>([])
@@ -429,8 +434,67 @@ export default function HistoricoBonificacoesPage() {
     }
   }
   
-  // Função para buscar todos os dados filtrados para PDF
-  const fetchAllDataForPdf = async (): Promise<HistoricoData[]> => {
+  // Helper: carregar biblioteca XLSX (com suporte a estilos) dinamicamente
+  const getXLSX = async (): Promise<any> => {
+    if (typeof window === "undefined") {
+      throw new Error("XLSX só pode ser carregado no browser")
+    }
+
+    // @ts-ignore
+    if (window.XLSX) {
+      // @ts-ignore
+      return window.XLSX
+    }
+
+    return await new Promise((resolve, reject) => {
+      // @ts-ignore
+      if (window.XLSX) {
+        // @ts-ignore
+        return resolve(window.XLSX)
+      }
+
+      const script = document.createElement("script")
+      script.src = "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"
+      script.async = true
+      script.onload = () => {
+        try {
+          // @ts-ignore
+          const XLSX = window.XLSX
+          if (XLSX) {
+            resolve(XLSX)
+          } else {
+            reject(new Error("XLSX não disponível após o carregamento"))
+          }
+        } catch (e) {
+          reject(e as any)
+        }
+      }
+      script.onerror = () => reject(new Error("Falha ao carregar XLSX do CDN"))
+      document.body.appendChild(script)
+    })
+  }
+
+  const onlyDigits = (value: any) => String(value ?? "").replace(/\D/g, "")
+  const isEmail = (value: any) => typeof value === "string" && /.+@.+\..+/.test(value)
+  const classifyPhone = (value: any): boolean => {
+    const digits = onlyDigits(value)
+    if (!digits) return false
+    const stripped = digits.startsWith("55") ? digits.slice(2) : digits
+    return stripped.length === 10 || stripped.length === 11
+  }
+  const isCpf = (value: any) => onlyDigits(value).length === 11
+  const isCnpj = (value: any) => onlyDigits(value).length === 14
+  const formatPhoneKey = (value: string): string => {
+    const digits = onlyDigits(value)
+    if (!digits) return ""
+    if (digits.startsWith("55")) {
+      return `+${digits}`
+    }
+    return `+55${digits}`
+  }
+
+  // Função para buscar todos os dados filtrados (PDF / Pedido E+)
+  const fetchAllDataForExport = async (): Promise<HistoricoData[]> => {
     try {
       const params = new URLSearchParams()
       params.append("page", "1")
@@ -529,7 +593,7 @@ export default function HistoricoBonificacoesPage() {
     setGeneratingPdf(true)
     try {
       // Buscar todos os dados filtrados
-      const allData = await fetchAllDataForPdf()
+      const allData = await fetchAllDataForExport()
       
       if (allData.length === 0) {
         toast({
@@ -721,6 +785,233 @@ export default function HistoricoBonificacoesPage() {
       })
     } finally {
       setGeneratingPdf(false)
+    }
+  }
+
+  const resolvePixInfo = (item: HistoricoData): { key: string; typeCode: "01" | "02" | "03" } => {
+    const doc = onlyDigits(item.cpf || "")
+    const raw = String(item.chave_pix ?? "").trim()
+    const tipoChave = String(item.tipo_chave ?? "").toLowerCase()
+
+    const ensureDoc = () => (doc ? doc : raw ? onlyDigits(raw) : doc)
+
+    const fallback = { key: ensureDoc() || "", typeCode: "03" as const }
+
+    if (raw) {
+      if (tipoChave.includes("email") || isEmail(raw)) {
+        return { key: raw, typeCode: "02" }
+      }
+      if (tipoChave.includes("celular") || tipoChave.includes("telefone") || classifyPhone(raw)) {
+        const phone = formatPhoneKey(raw)
+        return phone ? { key: phone, typeCode: "01" as const } : fallback
+      }
+      if (tipoChave.includes("cpf") || tipoChave.includes("cnpj") || isCpf(raw) || isCnpj(raw)) {
+        const digits = onlyDigits(raw)
+        return { key: digits || ensureDoc() || "", typeCode: "03" as const }
+      }
+
+      if (isEmail(raw)) {
+        return { key: raw, typeCode: "02" }
+      }
+      if (classifyPhone(raw)) {
+        const phone = formatPhoneKey(raw)
+        return phone ? { key: phone, typeCode: "01" as const } : fallback
+      }
+
+      const digits = onlyDigits(raw)
+      if (digits) {
+        return { key: digits, typeCode: "03" as const }
+      }
+
+      return { key: raw, typeCode: "03" as const }
+    }
+
+    return fallback
+  }
+
+  const parseValorCarga = (valor: number | string | undefined): number => {
+    if (valor === null || valor === undefined) return 0
+    if (typeof valor === "number") return valor
+
+    const str = valor.toString().trim()
+    if (!str) return 0
+
+    // Remover qualquer caractere que não seja dígito, ponto, vírgula ou sinal
+    let cleaned = str.replace(/[^\d.,-]/g, "")
+    if (!cleaned) return 0
+
+    const hasComma = cleaned.includes(",")
+    const hasDot = cleaned.includes(".")
+
+    if (hasComma && hasDot) {
+      // Formato PT-BR típico: 1.234,56 -> remover pontos (milhar) e trocar vírgula por ponto
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".")
+    } else if (hasComma) {
+      // Apenas vírgula: tratar como decimal
+      cleaned = cleaned.replace(/\./g, "").replace(",", ".")
+    } else {
+      // Apenas ponto ou nenhum separador: Number interpreta corretamente
+    }
+
+    const parsed = Number(cleaned)
+    return isNaN(parsed) ? 0 : parsed
+  }
+
+  const generatePedidoEPlus = async () => {
+    if (!filters.dt_pagamento_inicio) {
+      toast({
+        title: "Erro",
+        description: "Selecione a data de pagamento para gerar o pedido E+.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setGeneratingPedidoE(true)
+    try {
+      const allData = await fetchAllDataForExport()
+
+      if (allData.length === 0) {
+        toast({
+          title: "Nenhum dado encontrado",
+          description: "Não há registros para gerar o pedido E+ com os filtros aplicados.",
+          variant: "destructive"
+        })
+        setGeneratingPedidoE(false)
+        return
+      }
+
+      const rowsData = allData.map((item) => {
+        const doc = onlyDigits(item.cpf || "")
+        const normalizedDoc = doc || ""
+        const pixInfo = resolvePixInfo(item)
+        const chavePix = pixInfo.key || normalizedDoc
+        const tipo = pixInfo.typeCode
+        const valorNum = parseValorCarga(item.valor_carga)
+        const nome = String(item.nome ?? "")
+        return {
+          nome,
+          doc: normalizedDoc,
+          tipo,
+          chavePix,
+          valorNum
+        }
+      }).filter((row) => row.doc || row.chavePix)
+
+      rowsData.sort((a, b) => (b.valorNum || 0) - (a.valorNum || 0))
+
+      const rowsForSheet = rowsData.map(({ nome, doc: normalizedDoc, tipo, chavePix, valorNum }) => {
+        return [nome, normalizedDoc, tipo, chavePix, valorNum]
+      })
+
+      const rowsFormatted = rowsData.map(({ nome, doc: normalizedDoc, tipo, chavePix, valorNum }) => {
+        const valorStr = valorNum.toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        })
+        return [nome, normalizedDoc, tipo, chavePix, valorStr]
+      })
+
+      if (rowsForSheet.length === 0) {
+        toast({
+          title: "Nenhum dado exportável",
+          description: "Não foi possível montar o arquivo de pedido E+.",
+          variant: "destructive"
+        })
+        setGeneratingPedidoE(false)
+        return
+      }
+
+      const XLSX = await getXLSX()
+
+      const headers = [
+        "NOME/RAZAO DOCIAL",
+        "CPF/CNPJ",
+        "TIPO/CHAVE",
+        "CHAVE/PIX",
+        "VALOR"
+      ]
+
+      const aoa = [headers, ...rowsForSheet]
+      const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+      const range = XLSX.utils.decode_range(ws["!ref"] || "A1")
+      for (let c = 0; c <= 4; c++) {
+        const headerAddress = XLSX.utils.encode_cell({ r: range.s.r, c })
+        const headerCell = ws[headerAddress]
+        if (headerCell) {
+          headerCell.s = {
+            font: { bold: true, color: { rgb: "000000" } },
+            fill: { patternType: "solid", fgColor: { rgb: "FFCC00" } },
+            alignment: { horizontal: "center", vertical: "center" }
+          }
+        }
+      }
+
+      for (let r = range.s.r + 1; r <= range.e.r; r++) {
+        for (let c = 0; c <= 3; c++) {
+          const addr = XLSX.utils.encode_cell({ r, c })
+          const cell = ws[addr]
+          if (cell) {
+            cell.t = "s"
+            cell.v = String(cell.v ?? "")
+          }
+        }
+        const valorAddr = XLSX.utils.encode_cell({ r, c: 4 })
+        const valorCell = ws[valorAddr]
+        if (valorCell) {
+          valorCell.t = "n"
+          valorCell.z = 'R$ #,##0.00;[Red]-R$ #,##0.00'
+        }
+      }
+
+      const computeLen = (value: any) => {
+        if (value === null || value === undefined) return 0
+        return String(value).length
+      }
+
+      const colMax: number[] = [0, 0, 0, 0, 0]
+      headers.forEach((h, i) => {
+        colMax[i] = Math.max(colMax[i], String(h).length)
+      })
+      rowsFormatted.forEach((row) => {
+        row.forEach((cellValue, idx) => {
+          colMax[idx] = Math.max(colMax[idx], computeLen(cellValue))
+        })
+      })
+      ws["!cols"] = colMax.map((len) => ({ wch: Math.min(Math.max(len + 2, 10), 60) }))
+
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "pedido_E+")
+
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, "0")
+      const fileName = `pedido_E+_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.xlsx`
+
+      const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" })
+      const blob = new Blob([wbout], { type: "application/octet-stream" })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(url)
+
+      toast({
+        title: "Pedido E+ gerado",
+        description: `${rowsForSheet.length} registro(s) incluído(s) no arquivo.`
+      })
+    } catch (error: any) {
+      console.error("Erro ao gerar pedido E+:", error)
+      toast({
+        title: "Erro ao gerar pedido E+",
+        description: error?.message || "Não foi possível gerar o arquivo. Tente novamente.",
+        variant: "destructive"
+      })
+    } finally {
+      setGeneratingPedidoE(false)
     }
   }
 
@@ -1259,14 +1550,42 @@ export default function HistoricoBonificacoesPage() {
               <CardTitle className="text-xl">Histórico de Bonificações</CardTitle>
               <CardDescription>Filtre e visualize os registros de bonificações comerciais</CardDescription>
             </div>
-            <Button 
-              onClick={generatePdf} 
-              disabled={generatingPdf || !filters.dt_pagamento_inicio}
-              variant="outline"
-            >
-              <FileDown className="h-4 w-4 mr-2" />
-              {generatingPdf ? "Gerando PDF..." : "Gerar PDF"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {canGeneratePedidoE && (
+                <Button
+                  onClick={generatePedidoEPlus}
+                  disabled={generatingPedidoE || !filters.dt_pagamento_inicio}
+                >
+                  {generatingPedidoE ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4 mr-2" />
+                      Gerar pedido E+
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button 
+                onClick={generatePdf} 
+                disabled={generatingPdf || !filters.dt_pagamento_inicio}
+              >
+                {generatingPdf ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Gerando PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Gerar PDF
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">

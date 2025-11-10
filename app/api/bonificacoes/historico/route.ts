@@ -86,19 +86,19 @@ export async function GET(request: NextRequest) {
       // Normalizar CPF removendo formatação (pontos e traços) antes de buscar
       const normalizedCpf = cpf.replace(/\D/g, "")
       // Remover formatação do CPF no banco antes de comparar
-      whereConditions.push("REPLACE(REPLACE(REPLACE(cpf, '.', ''), '-', ''), ' ', '') LIKE ?")
+      whereConditions.push("REPLACE(REPLACE(REPLACE(ubc.cpf, '.', ''), '-', ''), ' ', '') LIKE ?")
       whereValues.push(`%${normalizedCpf}%`)
     }
     if (nome) {
-      whereConditions.push("nome LIKE ?")
+      whereConditions.push("ubc.nome LIKE ?")
       whereValues.push(`%${nome}%`)
     }
     if (dt_pagamento_inicio) {
-      whereConditions.push("dt_pagamento >= ?")
+      whereConditions.push("ubc.dt_pagamento >= ?")
       whereValues.push(dt_pagamento_inicio)
     }
     if (tipo_premiado) {
-      whereConditions.push("tipo_premiado = ?")
+      whereConditions.push("ubc.tipo_premiado = ?")
       whereValues.push(tipo_premiado)
     }
 
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
 
     // Contar total de registros
     const [countResult]: any = await connection.execute(
-      `SELECT COUNT(*) as total FROM unificado_bonificacao_comercial ${whereClause}`,
+      `SELECT COUNT(*) as total FROM unificado_bonificacao_comercial ubc ${whereClause}`,
       whereValues
     )
     const total = countResult[0]?.total || 0
@@ -141,8 +141,21 @@ export async function GET(request: NextRequest) {
     const orderByClause = `ORDER BY \`dt_pagamento\` DESC, \`id\` DESC, \`nome\` ASC`
     
     // Construir query de forma mais segura - usar LIMIT e OFFSET diretamente na string (como na API de regras)
-    let query = `SELECT cpf, nome, valor_carga, tipo_cartao, premiacao, tipo_premiado, mes_apurado, obs, dt_pagamento, id`
-    query += ` FROM unificado_bonificacao_comercial`
+    let query = `SELECT 
+        ubc.cpf, 
+        ubc.nome, 
+        ubc.valor_carga, 
+        ubc.tipo_cartao, 
+        ubc.premiacao, 
+        ubc.tipo_premiado, 
+        ubc.mes_apurado, 
+        ubc.obs, 
+        ubc.dt_pagamento, 
+        ubc.id,
+        rc.chave_pix AS chave_pix,
+        rc.tipo_chave AS tipo_chave
+      FROM unificado_bonificacao_comercial ubc
+      LEFT JOIN registro_chave_pix rc ON rc.cpf = ubc.cpf`
     
     if (whereClause) {
       query += ` ${whereClause}`

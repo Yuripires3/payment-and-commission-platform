@@ -351,10 +351,17 @@ def main():
                 if not SA_OK:
                     raise Exception("SQLAlchemy não está disponível. Instale o conector MySQL.")
                 
-                encoded_password = quote_plus('xEth+vOHltr*c4Eju3+t')
+                db_config_input = input_data.get("db_config") or {}
+                db_host = str(db_config_input.get("host") or os.getenv("DB_HOST") or "201.76.177.134")
+                db_port = int(db_config_input.get("port") or os.getenv("DB_PORT") or 3306)
+                db_user = str(db_config_input.get("user") or os.getenv("DB_USER") or "Indicadores")
+                db_password_raw = str(db_config_input.get("password") or os.getenv("DB_PASSWORD") or "xEth+vOHltr*c4Eju3+t")
+                db_name = str(db_config_input.get("database") or os.getenv("DB_NAME") or "indicadores")
+
+                encoded_password = quote_plus(db_password_raw)
                 # Adicionar charset utf8mb4 na conexão para garantir encoding correto
-                connection_string = f"mysql+mysqldb://Indicadores:{encoded_password}@201.76.177.134:3306/indicadores?charset=utf8mb4"
-                log_print(f"[Conexao] Tentando conectar ao banco de dados...")
+                connection_string = f"mysql+mysqldb://{db_user}:{encoded_password}@{db_host}:{db_port}/{db_name}?charset=utf8mb4"
+                log_print(f"[Conexao] Tentando conectar ao banco de dados em {db_host}:{db_port} com usuário {db_user}...")
                 engine = create_engine(
                     connection_string,
                     connect_args={
