@@ -662,8 +662,14 @@ export default function HistoricoBonificacoesPage() {
       
       yPos += 15
       
-      // Preparar dados da tabela
-      const tableData = allData.map(item => [
+      // Preparar dados da tabela ordenados alfabeticamente pelo nome
+      const sortedData = [...allData].sort((a, b) => {
+        const nomeA = (a.nome || "").toString()
+        const nomeB = (b.nome || "").toString()
+        return nomeA.localeCompare(nomeB, "pt-BR", { sensitivity: "base" })
+      })
+      
+      const tableData = sortedData.map(item => [
         item.nome || "",
         item.tipo_cartao || "CHAVE PIX",
         item.tipo_premiado || "",

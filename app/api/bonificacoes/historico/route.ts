@@ -128,13 +128,10 @@ export async function GET(request: NextRequest) {
     )
     const total = countResult[0]?.total || 0
     const totalPages = Math.ceil(total / pageSize)
-    
-    // Buscar dados com paginação
     const offset = (page - 1) * pageSize
     
-    // Construir ORDER BY - sempre ordenar por data de pagamento (mais recente primeiro), depois por data de registro (mais recente primeiro) e depois por nome (alfabética)
-    // ORDER BY múltiplo: primeiro por dt_pagamento DESC, depois por id DESC (data de registro), depois por nome ASC
-    const orderByClause = `ORDER BY \`dt_pagamento\` DESC, \`id\` DESC, \`nome\` ASC`
+    // Construir ORDER BY com múltiplas classificações
+    const orderByClause = "ORDER BY ubc.`dt_pagamento` DESC, ubc.`tipo_premiado` ASC, COALESCE(ubc.`valor_carga`, 0) DESC, ubc.`id` DESC"
     
     // Construir query de forma mais segura - usar LIMIT e OFFSET diretamente na string (como na API de regras)
     let query = `SELECT 
