@@ -1,6 +1,10 @@
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
+
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
-import { formatDateISO } from "@/lib/date-utils"
+import { formatDateISO, toEndOfDaySQL, toStartOfDaySQL } from "@/lib/date-utils"
 
 /**
  * GET /api/dashboard/evolucao-descontos
@@ -84,6 +88,9 @@ export async function GET(request: NextRequest) {
     // Buscar TODOS os registros do período e classificar por sinal do valor
     // Valores positivos = descontos realizados
     // Valores negativos = cancelamentos
+    const inicioSQL = toStartOfDaySQL(inicioCalculado)
+    const fimSQL = toEndOfDaySQL(fim)
+
     const [movimentacoesRows]: any = await connection.execute(
       `SELECT 
          DATE_FORMAT(dt_movimentacao, '%Y-%m') as mes,
@@ -94,7 +101,7 @@ export async function GET(request: NextRequest) {
          ${statusFilter}
        GROUP BY DATE_FORMAT(dt_movimentacao, '%Y-%m')
        ORDER BY mes ASC`,
-      [inicioCalculado, fim]
+      [inicioSQL, fimSQL]
     )
 
     // Buscar detalhes dos cancelamentos por mês (valores individuais)
@@ -108,7 +115,7 @@ export async function GET(request: NextRequest) {
          AND valor < 0
          ${statusFilter}
        ORDER BY dt_movimentacao ASC`,
-      [inicioCalculado, fim]
+      [inicioSQL, fimSQL]
     )
 
     // Criar mapas separando descontos (positivos) e cancelamentos (negativos)
@@ -155,7 +162,7 @@ export async function GET(request: NextRequest) {
        FROM registro_bonificacao_descontos
        WHERE dt_movimentacao < ?
          ${statusFilter}`,
-      [inicioCalculado]
+      [inicioSQL]
     )
 
     // Saldo histórico é a soma de todos os valores (já inclui positivos e negativos)

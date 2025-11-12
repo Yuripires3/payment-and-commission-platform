@@ -118,6 +118,9 @@ const getPrimeiroDiaMesAtualISO = () => {
 
 const getHojeISO = () => formatDateISO(new Date())
 
+const fetchNoStore = (input: string, init?: RequestInit) =>
+  fetch(input, { ...init, cache: "no-store" })
+
 // Tipos
 type Kpis = {
   comissoesMes: number
@@ -236,7 +239,7 @@ export default function DashboardContent() {
   useEffect(() => {
     const loadFiltros = async () => {
       try {
-        const res = await fetch("/api/dashboard/filtros")
+        const res = await fetchNoStore("/api/dashboard/filtros")
         if (!res.ok) throw new Error("Erro ao carregar filtros")
         const data = await res.json()
         setOperadorasDisponiveis(data.operadoras || [])
@@ -296,20 +299,20 @@ export default function DashboardContent() {
       
       // Se range > 12 meses, não carregar os 3 gráficos específicos aqui (serão carregados depois)
       const promises = [
-        fetch(`/api/dashboard/kpis?${params}`),
-        fetch(`/api/dashboard/top-corretores?${paramsTopFixos}`),
-        fetch(`/api/dashboard/top-supervisores?${paramsTopFixos}`),
-        fetch(`/api/dashboard/por-entidade?${params}`),
-        fetch(`/api/dashboard/por-operadora?${params}`),
-        fetch(`/api/dashboard/status-mensal?${params}`)
+        fetchNoStore(`/api/dashboard/kpis?${params}`),
+        fetchNoStore(`/api/dashboard/top-corretores?${paramsTopFixos}`),
+        fetchNoStore(`/api/dashboard/top-supervisores?${paramsTopFixos}`),
+        fetchNoStore(`/api/dashboard/por-entidade?${params}`),
+        fetchNoStore(`/api/dashboard/por-operadora?${params}`),
+        fetchNoStore(`/api/dashboard/status-mensal?${params}`)
       ]
 
       if (!rangeGreaterThan12Months) {
         // Se range <= 12 meses, carregar todos os gráficos normalmente
         promises.push(
-          fetch(`/api/dashboard/evolucao?${params}`),
-          fetch(`/api/dashboard/impacto-descontos?${params}`),
-          fetch(`/api/dashboard/evolucao-descontos?${params}`)
+          fetchNoStore(`/api/dashboard/evolucao?${params}`),
+          fetchNoStore(`/api/dashboard/impacto-descontos?${params}`),
+          fetchNoStore(`/api/dashboard/evolucao-descontos?${params}`)
         )
       }
 
@@ -359,9 +362,9 @@ export default function DashboardContent() {
             if (entidades.length > 0) chartParams.append("entidade", entidades.join(","))
 
             const [evolucaoRes, impactoRes, evolucaoDescontosRes] = await Promise.all([
-              fetch(`/api/dashboard/evolucao?${chartParams}`),
-              fetch(`/api/dashboard/impacto-descontos?${chartParams}`),
-              fetch(`/api/dashboard/evolucao-descontos?${chartParams}`)
+              fetchNoStore(`/api/dashboard/evolucao?${chartParams}`),
+              fetchNoStore(`/api/dashboard/impacto-descontos?${chartParams}`),
+              fetchNoStore(`/api/dashboard/evolucao-descontos?${chartParams}`)
             ])
 
             if (!evolucaoRes.ok) throw new Error("Erro ao carregar evolução")
@@ -431,9 +434,9 @@ export default function DashboardContent() {
 
       // Carregar apenas os três gráficos específicos
       const [evolucaoRes, impactoRes, evolucaoDescontosRes] = await Promise.all([
-        fetch(`/api/dashboard/evolucao?${params}`),
-        fetch(`/api/dashboard/impacto-descontos?${params}`),
-        fetch(`/api/dashboard/evolucao-descontos?${params}`)
+        fetchNoStore(`/api/dashboard/evolucao?${params}`),
+        fetchNoStore(`/api/dashboard/impacto-descontos?${params}`),
+        fetchNoStore(`/api/dashboard/evolucao-descontos?${params}`)
       ])
 
       if (!evolucaoRes.ok) throw new Error("Erro ao carregar evolução")

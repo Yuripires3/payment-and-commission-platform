@@ -9,10 +9,65 @@
 
 const DATA_CORTE = '2025-10-01'
 
+function construirDataReferencia(alias: string = 'ub'): string {
+  return `${alias}.dt_analise`
+}
+
+function buildRoleMatchExpression(alias: string, role: 'corretor' | 'supervisor'): string {
+  const field = `LOWER(TRIM(COALESCE(${alias}.nome_supervisor, '')))`
+  return `(${field} = '${role}' OR ${field} LIKE '${role} %' OR ${field} LIKE '% ${role}' OR ${field} LIKE '% ${role} %' OR ${field} LIKE '%${role}%')`
+}
+
+export function construirCondicaoPapelNovoModelo(
+  papel: 'corretor' | 'supervisor',
+  alias: string = 'ub'
+): string {
+  return buildRoleMatchExpression(alias, papel)
+}
+
+export function construirCampoCpfParceiro(
+  papelFiltro: 'geral' | 'corretores' | 'supervisores',
+  alias: string = 'ub'
+): string {
+  const sanitizeCpf = (field: string) =>
+    `NULLIF(REPLACE(REPLACE(REPLACE(TRIM(${field}), '.', ''), '-', ''), '/', ''), '')`
+
+  const cpfCorretor = sanitizeCpf(`${alias}.cpf_corretor`)
+  const cpfSupervisor = sanitizeCpf(`${alias}.cpf_supervisor`)
+  const condicaoCorretorNovoModelo = construirCondicaoPapelNovoModelo('corretor', alias)
+  const condicaoSupervisorNovoModelo = construirCondicaoPapelNovoModelo('supervisor', alias)
+
+  if (papelFiltro === 'corretores') {
+    return `(CASE 
+      WHEN ${alias}.dt_analise < '${DATA_CORTE}' THEN ${cpfCorretor}
+      WHEN ${alias}.dt_analise >= '${DATA_CORTE}' AND ${condicaoCorretorNovoModelo} THEN ${cpfCorretor}
+      ELSE NULL
+    END)`
+  }
+
+  if (papelFiltro === 'supervisores') {
+    return `(CASE 
+      WHEN ${alias}.dt_analise < '${DATA_CORTE}' THEN ${cpfSupervisor}
+      WHEN ${alias}.dt_analise >= '${DATA_CORTE}' AND ${condicaoSupervisorNovoModelo} THEN ${cpfCorretor}
+      ELSE NULL
+    END)`
+  }
+
+  return `(CASE 
+    WHEN ${alias}.dt_analise < '${DATA_CORTE}' THEN COALESCE(${cpfCorretor}, ${cpfSupervisor})
+    WHEN ${alias}.dt_analise >= '${DATA_CORTE}' THEN
+      ${cpfCorretor}
+    ELSE NULL
+  END)`
+}
+
 /**
  * Verifica se uma data está no novo modelo (>= 2025-10-01) por dt_analise
  */
-export function isNovoModelo(_dataPagamento: string | null | undefined, dtAnalise?: string | null): boolean {
+export function isNovoModelo(
+  _dtPagamento: string | null | undefined,
+  dtAnalise?: string | null
+): boolean {
   const dataRef = dtAnalise
   if (!dataRef) return false
   return dataRef >= DATA_CORTE
@@ -24,8 +79,8 @@ export function isNovoModelo(_dataPagamento: string | null | undefined, dtAnalis
 export function derivarPapel(nomeSupervisor: string | null | undefined): 'corretor' | 'supervisor' | 'indefinido' {
   if (!nomeSupervisor) return 'indefinido'
   const papel = nomeSupervisor.trim().toLowerCase()
-  if (papel === 'corretor') return 'corretor'
-  if (papel === 'supervisor') return 'supervisor'
+  if (papel === 'corretor' || papel.includes('corretor')) return 'corretor'
+  if (papel === 'supervisor' || papel.includes('supervisor')) return 'supervisor'
   return 'indefinido'
 }
 
@@ -44,24 +99,28 @@ export function construirCampoValorPorData(
   papelFiltro: 'geral' | 'corretores' | 'supervisores',
   alias: string = 'ub'
 ): string {
+  const dataReferencia = construirDataReferencia(alias)
+
   // Lógica antiga (< 2025-10-01): usa colunas separadas
   // Lógica nova (>= 2025-10-01): usa apenas vlr_bruto_corretor, filtrando por papel derivado, com base em dt_analise
   
   if (papelFiltro === 'corretores') {
+    const roleMatch = buildRoleMatchExpression(alias, 'corretor')
     return `COALESCE(SUM(
       CASE 
-        WHEN ${alias}.dt_analise < '${DATA_CORTE}' THEN ${alias}.vlr_bruto_corretor
-        WHEN ${alias}.dt_analise >= '${DATA_CORTE}' 
-             AND LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) = 'corretor' THEN ${alias}.vlr_bruto_corretor
+        WHEN ${dataReferencia} < '${DATA_CORTE}' THEN ${alias}.vlr_bruto_corretor
+        WHEN ${dataReferencia} >= '${DATA_CORTE}' 
+             AND ${roleMatch} THEN ${alias}.vlr_bruto_corretor
         ELSE 0
       END
     ), 0)`
   } else if (papelFiltro === 'supervisores') {
+    const roleMatch = buildRoleMatchExpression(alias, 'supervisor')
     return `COALESCE(SUM(
       CASE 
-        WHEN ${alias}.dt_analise < '${DATA_CORTE}' THEN ${alias}.vlr_bruto_supervisor
-        WHEN ${alias}.dt_analise >= '${DATA_CORTE}' 
-             AND LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) = 'supervisor' THEN ${alias}.vlr_bruto_corretor
+        WHEN ${dataReferencia} < '${DATA_CORTE}' THEN ${alias}.vlr_bruto_supervisor
+        WHEN ${dataReferencia} >= '${DATA_CORTE}' 
+             AND ${roleMatch} THEN ${alias}.vlr_bruto_corretor
         ELSE 0
       END
     ), 0)`
@@ -69,10 +128,9 @@ export function construirCampoValorPorData(
     // Geral: soma tudo (mas exclui "indefinido" no novo modelo)
     return `COALESCE(SUM(
       CASE 
-        WHEN ${alias}.dt_analise < '${DATA_CORTE}' 
+        WHEN ${dataReferencia} < '${DATA_CORTE}' 
           THEN COALESCE(${alias}.vlr_bruto_corretor, 0) + COALESCE(${alias}.vlr_bruto_supervisor, 0)
-        WHEN ${alias}.dt_analise >= '${DATA_CORTE}' 
-             AND LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) IN ('corretor', 'supervisor')
+        WHEN ${dataReferencia} >= '${DATA_CORTE}' 
           THEN ${alias}.vlr_bruto_corretor
         ELSE 0
       END
@@ -88,34 +146,31 @@ export function construirFiltroPapel(
   papelFiltro: 'geral' | 'corretores' | 'supervisores',
   alias: string = 'ub'
 ): string {
+  const dataReferencia = construirDataReferencia(alias)
+
   if (papelFiltro === 'geral') {
-    // Para geral, apenas excluir "indefinido" no novo modelo
-    return `AND (
-      ${alias}.dt_analise < '${DATA_CORTE}' 
-      OR (
-        ${alias}.dt_analise >= '${DATA_CORTE}' 
-        AND LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) IN ('corretor', 'supervisor')
-      )
-    )`
+    return ''
   }
   
   // Para novo modelo (>= 2025-10-01), filtrar por papel derivado
   // Para modelo antigo (< 2025-10-01), já é tratado pelo campo valor
   // Mas precisamos garantir que excluímos "indefinido" no novo modelo
   if (papelFiltro === 'corretores') {
+    const roleMatch = buildRoleMatchExpression(alias, 'corretor')
     return `AND (
-      ${alias}.dt_analise < '${DATA_CORTE}' 
+      ${dataReferencia} < '${DATA_CORTE}' 
       OR (
-        ${alias}.dt_analise >= '${DATA_CORTE}' 
-        AND LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) = 'corretor'
+        ${dataReferencia} >= '${DATA_CORTE}' 
+        AND ${roleMatch}
       )
     )`
   } else if (papelFiltro === 'supervisores') {
+    const roleMatch = buildRoleMatchExpression(alias, 'supervisor')
     return `AND (
-      ${alias}.dt_analise < '${DATA_CORTE}' 
+      ${dataReferencia} < '${DATA_CORTE}' 
       OR (
-        ${alias}.dt_analise >= '${DATA_CORTE}' 
-        AND LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) = 'supervisor'
+        ${dataReferencia} >= '${DATA_CORTE}' 
+        AND ${roleMatch}
       )
     )`
   }
@@ -134,17 +189,19 @@ export function construirCampoNomeExibicao(alias: string = 'ub'): string {
  * Constrói SELECT para papel derivado
  */
 export function construirCampoPapel(alias: string = 'ub'): string {
+  const dataReferencia = construirDataReferencia(alias)
+
   return `CASE 
-    WHEN ${alias}.dt_analise < '${DATA_CORTE}' THEN
+    WHEN ${dataReferencia} < '${DATA_CORTE}' THEN
       CASE 
         WHEN ${alias}.cpf_corretor IS NOT NULL AND ${alias}.cpf_corretor != '' THEN 'corretor'
         WHEN ${alias}.cpf_supervisor IS NOT NULL AND ${alias}.cpf_supervisor != '' THEN 'supervisor'
         ELSE 'indefinido'
       END
-    WHEN ${alias}.dt_analise >= '${DATA_CORTE}' THEN
+    WHEN ${dataReferencia} >= '${DATA_CORTE}' THEN
       CASE 
-        WHEN LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) = 'corretor' THEN 'corretor'
-        WHEN LOWER(TRIM(COALESCE(${alias}.nome_supervisor, ''))) = 'supervisor' THEN 'supervisor'
+        WHEN ${buildRoleMatchExpression(alias, 'corretor')} THEN 'corretor'
+        WHEN ${buildRoleMatchExpression(alias, 'supervisor')} THEN 'supervisor'
         ELSE 'indefinido'
       END
     ELSE 'indefinido'

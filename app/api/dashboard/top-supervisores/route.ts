@@ -1,6 +1,13 @@
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
+
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
-import { construirCampoNomeExibicao } from "@/lib/dashboard-helpers"
+import { formatDateISO, toEndOfDaySQL, toStartOfDaySQL } from "@/lib/date-utils"
+import { construirCampoNomeExibicao, construirCondicaoPapelNovoModelo } from "@/lib/dashboard-helpers"
+    const condicaoCorretorNovoModelo = construirCondicaoPapelNovoModelo('corretor')
+    const condicaoSupervisorNovoModelo = construirCondicaoPapelNovoModelo('supervisor')
 
 /**
  * GET /api/dashboard/top-supervisores
@@ -50,16 +57,24 @@ export async function GET(request: NextRequest) {
     const whereConditions: string[] = []
     const whereValues: any[] = []
 
-    whereConditions.push("ub.dt_analise >= ?")
-    whereValues.push(inicio)
-    whereConditions.push("ub.dt_analise <= ?")
-    whereValues.push(fim)
+    const inicioDate = formatDateISO(inicio)
+    const fimDate = formatDateISO(fim)
+    const inicioSQL = toStartOfDaySQL(inicioDate)
+    const fimSQL = toEndOfDaySQL(fimDate)
+    const dataReferencia = "ub.dt_analise"
+    const condicaoDataInicio = `${dataReferencia} >= ?`
+    const condicaoDataFim = `${dataReferencia} <= ?`
+
+    whereConditions.push(condicaoDataInicio)
+    whereValues.push(inicioSQL)
+    whereConditions.push(condicaoDataFim)
+    whereValues.push(fimSQL)
 
     // Filtrar apenas supervisores (modelo antigo ou novo)
     whereConditions.push(`(
-      (ub.dt_analise < '2025-10-01' AND ub.cpf_supervisor IS NOT NULL AND ub.cpf_supervisor != '')
-      OR (ub.dt_analise >= '2025-10-01' 
-          AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'supervisor' 
+      (${dataReferencia} < '2025-10-01' AND ub.cpf_supervisor IS NOT NULL AND ub.cpf_supervisor != '')
+      OR (${dataReferencia} >= '2025-10-01' 
+          AND ${condicaoSupervisorNovoModelo} 
           AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
     )`)
 
@@ -89,7 +104,7 @@ export async function GET(request: NextRequest) {
          AND LOWER(tipo_movimentacao) = 'desconto realizado'
          ${statusFilter}
        GROUP BY cpf`,
-      [inicio, fim]
+      [inicioSQL, fimSQL]
     )
     const descontosMap = new Map<string, number>()
     descontosRows.forEach((row: any) => {
@@ -107,15 +122,15 @@ export async function GET(request: NextRequest) {
     // Query para modelo antigo (< 2025-10-01)
     const whereAntigoConditions = [...whereConditions]
     const whereAntigoValues = [...whereValues]
-    whereAntigoConditions.push("ub.dt_analise < '2025-10-01'")
+    whereAntigoConditions.push(`${dataReferencia} < '2025-10-01'`)
     whereAntigoConditions.push("ub.cpf_supervisor IS NOT NULL AND ub.cpf_supervisor != ''")
     const whereAntigoClause = `WHERE ${whereAntigoConditions.join(" AND ")}`
     
     // Query para modelo novo (>= 2025-10-01)
     const whereNovoConditions = [...whereConditions]
     const whereNovoValues = [...whereValues]
-    whereNovoConditions.push("ub.dt_analise >= '2025-10-01'")
-    whereNovoConditions.push("LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'supervisor'")
+    whereNovoConditions.push(`${dataReferencia} >= '2025-10-01'`)
+    whereNovoConditions.push(condicaoSupervisorNovoModelo)
     whereNovoConditions.push("ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != ''")
     const whereNovoClause = `WHERE ${whereNovoConditions.join(" AND ")}`
     

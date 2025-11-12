@@ -1,5 +1,10 @@
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
+
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
+import { formatDateISO, toEndOfDaySQL, toStartOfDaySQL } from "@/lib/date-utils"
 import { construirCampoValorPorData, construirFiltroPapel } from "@/lib/dashboard-helpers"
 
 /**
@@ -54,10 +59,18 @@ export async function GET(request: NextRequest) {
     const whereConditions: string[] = []
     const whereValues: any[] = []
 
-    whereConditions.push("ub.dt_analise >= ?")
-    whereValues.push(inicio)
-    whereConditions.push("ub.dt_analise <= ?")
-    whereValues.push(fim)
+    const inicioDate = formatDateISO(inicio)
+    const fimDate = formatDateISO(fim)
+    const inicioSQL = toStartOfDaySQL(inicioDate)
+    const fimSQL = toEndOfDaySQL(fimDate)
+    const dataReferencia = "ub.dt_analise"
+    const condicaoDataInicio = `${dataReferencia} >= ?`
+    const condicaoDataFim = `${dataReferencia} <= ?`
+
+    whereConditions.push(condicaoDataInicio)
+    whereValues.push(inicioSQL)
+    whereConditions.push(condicaoDataFim)
+    whereValues.push(fimSQL)
 
     if (operadora) {
       whereConditions.push("ub.operadora = ?")
@@ -81,11 +94,11 @@ export async function GET(request: NextRequest) {
 
     const [pagamentosRows]: any = await connection.execute(
       `SELECT 
-         DATE_FORMAT(ub.dt_analise, '%Y-%m') as mes,
+         DATE_FORMAT(${dataReferencia}, '%Y-%m') as mes,
          ${campoValor} as pagamentos
        FROM unificado_bonificacao ub
        ${whereClause}
-       GROUP BY DATE_FORMAT(ub.dt_analise, '%Y-%m')
+       GROUP BY DATE_FORMAT(${dataReferencia}, '%Y-%m')
        ORDER BY mes ASC`,
       whereValues
     )
@@ -104,7 +117,7 @@ export async function GET(request: NextRequest) {
          ${statusFilter}
        GROUP BY DATE_FORMAT(dt_movimentacao, '%Y-%m')
        ORDER BY mes ASC`,
-      [inicio, fim]
+      [inicioSQL, fimSQL]
     )
 
     // Criar mapas

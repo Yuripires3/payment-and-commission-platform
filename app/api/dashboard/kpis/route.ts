@@ -1,7 +1,11 @@
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
+
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
-import { construirCampoValorPorData, construirFiltroPapel } from "@/lib/dashboard-helpers"
-import { formatDateISO } from "@/lib/date-utils"
+import { construirCampoValorPorData, construirCampoCpfParceiro, construirCondicaoPapelNovoModelo, construirFiltroPapel } from "@/lib/dashboard-helpers"
+import { formatDateISO, toEndOfDaySQL, toStartOfDaySQL } from "@/lib/date-utils"
 
 /**
  * GET /api/dashboard/kpis
@@ -53,13 +57,22 @@ export async function GET(request: NextRequest) {
     await connection.execute("SET character_set_connection=utf8mb4")
 
     // Construir WHERE clause base por dt_analise
+    const inicioDate = formatDateISO(inicio)
+    const fimDate = formatDateISO(fim)
+    const inicioSQL = toStartOfDaySQL(inicioDate)
+    const fimSQL = toEndOfDaySQL(fimDate)
+
     const whereConditions: string[] = []
     const whereValues: any[] = []
 
-    whereConditions.push("ub.dt_analise >= ?")
-    whereValues.push(inicio)
-    whereConditions.push("ub.dt_analise <= ?")
-    whereValues.push(fim)
+    const dataReferencia = "ub.dt_analise"
+    const condicaoDataInicio = `${dataReferencia} >= ?`
+    const condicaoDataFim = `${dataReferencia} <= ?`
+
+    whereConditions.push(condicaoDataInicio)
+    whereValues.push(inicioSQL)
+    whereConditions.push(condicaoDataFim)
+    whereValues.push(fimSQL)
 
     if (operadora) {
       whereConditions.push("ub.operadora = ?")
@@ -77,6 +90,7 @@ export async function GET(request: NextRequest) {
     // Adicionar filtro de papel
     const filtroPapel = construirFiltroPapel(papel as 'geral' | 'corretores' | 'supervisores')
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")} ${filtroPapel}` : `WHERE 1=1 ${filtroPapel}`
+    const baseWhereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : "WHERE 1=1"
 
     // Calcular mês atual e mês anterior para variação
     const dataFim = new Date(fim)
@@ -94,24 +108,24 @@ export async function GET(request: NextRequest) {
     // Construir WHERE para mês atual
     const whereMesAtualConditions = [...whereConditions]
     const whereMesAtualValues = [...whereValues]
-    const idxInicio = whereMesAtualConditions.findIndex(c => c.includes("ub.dt_analise >="))
-    const idxFim = whereMesAtualConditions.findIndex(c => c.includes("ub.dt_analise <="))
-    if (idxInicio >= 0) whereMesAtualConditions[idxInicio] = "ub.dt_analise >= ?"
-    if (idxFim >= 0) whereMesAtualConditions[idxFim] = "ub.dt_analise <= ?"
-    whereMesAtualValues[0] = inicioMesAtual
-    whereMesAtualValues[1] = fimMesAtual
+    const idxInicio = whereMesAtualConditions.findIndex(c => c === condicaoDataInicio)
+    const idxFim = whereMesAtualConditions.findIndex(c => c === condicaoDataFim)
+    if (idxInicio >= 0) whereMesAtualConditions[idxInicio] = condicaoDataInicio
+    if (idxFim >= 0) whereMesAtualConditions[idxFim] = condicaoDataFim
+    whereMesAtualValues[0] = toStartOfDaySQL(inicioMesAtual)
+    whereMesAtualValues[1] = toEndOfDaySQL(fimMesAtual)
     const filtroPapelMesAtual = construirFiltroPapel(papel as 'geral' | 'corretores' | 'supervisores')
     const whereMesAtual = `WHERE ${whereMesAtualConditions.join(" AND ")} ${filtroPapelMesAtual}`
 
     // Construir WHERE para mês anterior
     const whereMesAnteriorConditions = [...whereConditions]
     const whereMesAnteriorValues = [...whereValues]
-    const idxInicioAnt = whereMesAnteriorConditions.findIndex(c => c.includes("ub.dt_analise >="))
-    const idxFimAnt = whereMesAnteriorConditions.findIndex(c => c.includes("ub.dt_analise <="))
-    if (idxInicioAnt >= 0) whereMesAnteriorConditions[idxInicioAnt] = "ub.dt_analise >= ?"
-    if (idxFimAnt >= 0) whereMesAnteriorConditions[idxFimAnt] = "ub.dt_analise <= ?"
-    whereMesAnteriorValues[0] = inicioMesAnterior
-    whereMesAnteriorValues[1] = fimMesAnterior
+    const idxInicioAnt = whereMesAnteriorConditions.findIndex(c => c === condicaoDataInicio)
+    const idxFimAnt = whereMesAnteriorConditions.findIndex(c => c === condicaoDataFim)
+    if (idxInicioAnt >= 0) whereMesAnteriorConditions[idxInicioAnt] = condicaoDataInicio
+    if (idxFimAnt >= 0) whereMesAnteriorConditions[idxFimAnt] = condicaoDataFim
+    whereMesAnteriorValues[0] = toStartOfDaySQL(inicioMesAnterior)
+    whereMesAnteriorValues[1] = toEndOfDaySQL(fimMesAnterior)
     const filtroPapelMesAnterior = construirFiltroPapel(papel as 'geral' | 'corretores' | 'supervisores')
     const whereMesAnterior = `WHERE ${whereMesAnteriorConditions.join(" AND ")} ${filtroPapelMesAnterior}`
 
@@ -135,7 +149,7 @@ export async function GET(request: NextRequest) {
        WHERE dt_movimentacao >= ? AND dt_movimentacao <= ?
          AND LOWER(tipo_movimentacao) = 'desconto realizado'
          ${statusFilter}`,
-      [inicio, fim]
+      [inicioDate, fimDate]
     )
 
     // Calcular valores do período completo
@@ -192,67 +206,15 @@ export async function GET(request: NextRequest) {
       : (comissoesMes > 0 ? 100 : 0)
 
     // Parceiros ativos (distinct corretores ou supervisores conforme papel e modelo)
-    let parceirosQuery = ""
-    if (papel === "corretores") {
-      parceirosQuery = `SELECT COUNT(DISTINCT 
-        CASE 
-          WHEN COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' THEN ub.cpf_corretor
-          ELSE CASE WHEN LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' THEN ub.cpf_corretor ELSE NULL END
-        END
-      ) as total
-        FROM unificado_bonificacao ub
-        ${whereClause}
-        AND (
-          (COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-          OR (COALESCE(ub.dt_pagamento, ub.dt_analise) >= '2025-10-01' AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-        )`
-    } else if (papel === "supervisores") {
-      parceirosQuery = `SELECT COUNT(DISTINCT 
-        CASE 
-          WHEN COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' THEN ub.cpf_supervisor
-          ELSE CASE WHEN LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'supervisor' THEN ub.cpf_corretor ELSE NULL END
-        END
-      ) as total
-        FROM unificado_bonificacao ub
-        ${whereClause}
-        AND (
-          (COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' AND ub.cpf_supervisor IS NOT NULL AND ub.cpf_supervisor != '')
-          OR (COALESCE(ub.dt_pagamento, ub.dt_analise) >= '2025-10-01' AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'supervisor' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-        )`
-    } else {
-      // Para "geral", usar UNION para garantir valores únicos de corretores e supervisores
-      parceirosQuery = `SELECT COUNT(DISTINCT cpf) as total
-        FROM (
-          SELECT DISTINCT
-            CASE 
-              WHEN COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' THEN ub.cpf_corretor
-              ELSE CASE WHEN LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' THEN ub.cpf_corretor ELSE NULL END
-            END as cpf
-          FROM unificado_bonificacao ub
-          ${whereClause}
-          AND (
-            (COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-            OR (COALESCE(ub.dt_pagamento, ub.dt_analise) >= '2025-10-01' AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-          )
-          UNION
-          SELECT DISTINCT
-            CASE 
-              WHEN COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' THEN ub.cpf_supervisor
-              ELSE CASE WHEN LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'supervisor' THEN ub.cpf_corretor ELSE NULL END
-            END as cpf
-          FROM unificado_bonificacao ub
-          ${whereClause}
-          AND (
-            (COALESCE(ub.dt_pagamento, ub.dt_analise) < '2025-10-01' AND ub.cpf_supervisor IS NOT NULL AND ub.cpf_supervisor != '')
-            OR (COALESCE(ub.dt_pagamento, ub.dt_analise) >= '2025-10-01' AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'supervisor' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-          )
-        ) as parceiros_unicos
-        WHERE cpf IS NOT NULL AND cpf != ''`
-    }
+    const campoCpfParceiro = construirCampoCpfParceiro(papel as 'geral' | 'corretores' | 'supervisores')
+    const parceirosQuery = `
+      SELECT COUNT(DISTINCT ${campoCpfParceiro}) as total
+      FROM unificado_bonificacao ub
+      ${whereClause}
+      AND ${campoCpfParceiro} IS NOT NULL
+    `
 
-    // Para query UNION, precisamos duplicar os valores do whereClause
-    const parceirosValues = papel === "geral" ? [...whereValues, ...whereValues] : whereValues
-    const [parceiros]: any = await connection.execute(parceirosQuery, parceirosValues)
+    const [parceiros]: any = await connection.execute(parceirosQuery, whereValues)
 
     // Vidas pagas (count distinct beneficiários)
     const [vidasPagas]: any = await connection.execute(
@@ -286,6 +248,13 @@ export async function GET(request: NextRequest) {
       whereSemPapelValues
     )
 
+    const [intervalInfo]: any = await connection.execute(
+      `SELECT COUNT(*) as total, MIN(${dataReferencia}) as min_dt_analise, MAX(${dataReferencia}) as max_dt_analise
+       FROM unificado_bonificacao ub
+       ${baseWhereClause}`,
+      whereValues
+    )
+
     return NextResponse.json({
       comissoesMes,
       variacaoMesPercent: Number(variacaoMesPercent.toFixed(2)),
@@ -297,7 +266,16 @@ export async function GET(request: NextRequest) {
       comissoesCorretores: Number(valoresBrutos[0]?.comissoes_corretor || 0),
       comissoesSupervisores: Number(valoresBrutos[0]?.comissoes_supervisor || 0),
       descontoTotal: descontosAtual,
-      pagamentosBruto: pagamentosAtual
+      pagamentosBruto: pagamentosAtual,
+      meta: {
+        totalRegistrosPeriodo: Number(intervalInfo?.[0]?.total || 0),
+        minDtAnalise: intervalInfo?.[0]?.min_dt_analise || null,
+        maxDtAnalise: intervalInfo?.[0]?.max_dt_analise || null,
+        filtros: {
+          inicio: inicioDate,
+          fim: fimDate,
+        },
+      },
     })
   } catch (error: any) {
     console.error("Erro ao buscar KPIs:", error)

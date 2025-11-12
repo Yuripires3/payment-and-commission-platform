@@ -1,5 +1,10 @@
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
+
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
+import { formatDateISO, toEndOfDaySQL, toStartOfDaySQL } from "@/lib/date-utils"
 import { construirCampoValorPorData, construirFiltroPapel } from "@/lib/dashboard-helpers"
 
 /**
@@ -51,10 +56,18 @@ export async function GET(request: NextRequest) {
     const whereConditions: string[] = []
     const whereValues: any[] = []
 
-    whereConditions.push("ub.dt_analise >= ?")
-    whereValues.push(inicio)
-    whereConditions.push("ub.dt_analise <= ?")
-    whereValues.push(fim)
+    const inicioDate = formatDateISO(inicio)
+    const fimDate = formatDateISO(fim)
+    const inicioSQL = toStartOfDaySQL(inicioDate)
+    const fimSQL = toEndOfDaySQL(fimDate)
+    const dataReferencia = "ub.dt_analise"
+    const condicaoDataInicio = `${dataReferencia} >= ?`
+    const condicaoDataFim = `${dataReferencia} <= ?`
+
+    whereConditions.push(condicaoDataInicio)
+    whereValues.push(inicioSQL)
+    whereConditions.push(condicaoDataFim)
+    whereValues.push(fimSQL)
     whereConditions.push("ub.entidade IS NOT NULL AND ub.entidade != ''")
 
     if (operadora) {
@@ -85,7 +98,7 @@ export async function GET(request: NextRequest) {
          AND LOWER(tipo_movimentacao) = 'desconto realizado'
          ${statusFilter}
        GROUP BY cpf`,
-      [inicio, fim]
+      [inicioSQL, fimSQL]
     )
     const descontosMap = new Map<string, number>()
     descontosRows.forEach((row: any) => {

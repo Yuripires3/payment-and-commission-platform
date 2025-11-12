@@ -1,6 +1,12 @@
+export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
+
 import { NextRequest, NextResponse } from "next/server"
 import { getDBConnection, getDescontosStatusFilter } from "@/lib/db"
-import { construirCampoNomeExibicao } from "@/lib/dashboard-helpers"
+import { formatDateISO, toEndOfDaySQL, toStartOfDaySQL } from "@/lib/date-utils"
+import { construirCampoNomeExibicao, construirCondicaoPapelNovoModelo } from "@/lib/dashboard-helpers"
+    const condicaoCorretorNovoModelo = construirCondicaoPapelNovoModelo('corretor')
 
 /**
  * GET /api/dashboard/top-corretores
@@ -50,16 +56,24 @@ export async function GET(request: NextRequest) {
     const whereConditions: string[] = []
     const whereValues: any[] = []
 
-    whereConditions.push("ub.dt_analise >= ?")
-    whereValues.push(inicio)
-    whereConditions.push("ub.dt_analise <= ?")
-    whereValues.push(fim)
+    const inicioDate = formatDateISO(inicio)
+    const fimDate = formatDateISO(fim)
+    const inicioSQL = toStartOfDaySQL(inicioDate)
+    const fimSQL = toEndOfDaySQL(fimDate)
+    const dataReferencia = "ub.dt_analise"
+    const condicaoDataInicio = `${dataReferencia} >= ?`
+    const condicaoDataFim = `${dataReferencia} <= ?`
+
+    whereConditions.push(condicaoDataInicio)
+    whereValues.push(inicioSQL)
+    whereConditions.push(condicaoDataFim)
+    whereValues.push(fimSQL)
 
     // Filtrar apenas corretores (modelo antigo ou novo)
     whereConditions.push(`(
-      (ub.dt_analise < '2025-10-01' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
-      OR (ub.dt_analise >= '2025-10-01' 
-          AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' 
+      (${dataReferencia} < '2025-10-01' AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
+      OR (${dataReferencia} >= '2025-10-01' 
+          AND ${condicaoCorretorNovoModelo}
           AND ub.cpf_corretor IS NOT NULL AND ub.cpf_corretor != '')
     )`)
 
@@ -89,7 +103,7 @@ export async function GET(request: NextRequest) {
          AND LOWER(tipo_movimentacao) = 'desconto realizado'
          ${statusFilter}
        GROUP BY cpf`,
-      [inicio, fim]
+      [inicioSQL, fimSQL]
     )
     const descontosMap = new Map<string, number>()
     descontosRows.forEach((row: any) => {
@@ -109,9 +123,9 @@ export async function GET(request: NextRequest) {
          'corretor' as papel,
          COALESCE(SUM(
            CASE 
-             WHEN ub.dt_analise < '2025-10-01' THEN ub.vlr_bruto_corretor
-             WHEN ub.dt_analise >= '2025-10-01' 
-                  AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' THEN ub.vlr_bruto_corretor
+             WHEN ${dataReferencia} < '2025-10-01' THEN ub.vlr_bruto_corretor
+             WHEN ${dataReferencia} >= '2025-10-01' 
+                  AND ${condicaoCorretorNovoModelo} THEN ub.vlr_bruto_corretor
              ELSE 0
            END
          ), 0) as valor_bruto,
@@ -120,9 +134,9 @@ export async function GET(request: NextRequest) {
            WHEN COUNT(DISTINCT CONCAT(ub.cpf, '-', COALESCE(ub.id_beneficiario, ''))) > 0 
            THEN COALESCE(SUM(
              CASE 
-               WHEN ub.dt_analise < '2025-10-01' THEN ub.vlr_bruto_corretor
-               WHEN ub.dt_analise >= '2025-10-01' 
-                    AND LOWER(TRIM(COALESCE(ub.nome_supervisor, ''))) = 'corretor' THEN ub.vlr_bruto_corretor
+             WHEN ${dataReferencia} < '2025-10-01' THEN ub.vlr_bruto_corretor
+             WHEN ${dataReferencia} >= '2025-10-01' 
+                    AND ${condicaoCorretorNovoModelo} THEN ub.vlr_bruto_corretor
                ELSE 0
              END
            ), 0) / COUNT(DISTINCT CONCAT(ub.cpf, '-', COALESCE(ub.id_beneficiario, '')))
