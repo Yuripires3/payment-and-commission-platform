@@ -2,9 +2,9 @@
  * Helper de permissões baseado na classificação do usuário
  */
 
-export type UserClassification = "ADMIN" | "USUARIO" | "COMERCIAL" | "admin" | "usuario" | "comercial"
+type UserClassification = "ADMIN" | "USUARIO" | "COMERCIAL" | "admin" | "usuario" | "comercial"
 
-export interface User {
+interface User {
   classificacao?: UserClassification | string
   role?: "admin" | "user"
   id?: string
@@ -67,28 +67,5 @@ export function canDeleteRules(user: User | null | undefined): boolean {
  */
 export function canImportRules(user: User | null | undefined): boolean {
   return canEditRules(user)
-}
-
-/**
- * Verifica se o usuário pode visualizar regras (todos podem)
- */
-export function canViewRules(user: User | null | undefined): boolean {
-  return true // Todos podem visualizar
-}
-
-/**
- * Verifica se o usuário é ADMIN
- */
-export function isAdmin(user: User | null | undefined): boolean {
-  const classification = normalizeClassification(user)
-  return classification === "ADMIN"
-}
-
-/**
- * Verifica se o usuário é COMERCIAL (apenas visualização)
- */
-export function isCOMERCIAL(user: User | null | undefined): boolean {
-  const classification = normalizeClassification(user)
-  return classification === "COMERCIAL"
 }
 

@@ -60,6 +60,13 @@ export default function CalculoBonificacaoPage() {
   const { toast } = useToast()
   const router = useRouter()
   const { user } = useAuth() as any
+  const [runId, setRunId] = useState<string | null>(null)
+  const [sessionId] = useState<string>(() => {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID()
+    }
+    return `session_${Date.now()}_${Math.random().toString(16).slice(2)}`
+  })
   const [modo, setModo] = useState<"automatico" | "periodo">("automatico")
   const [dataInicial, setDataInicial] = useState("")
   const [dataFinal, setDataFinal] = useState("")
@@ -128,6 +135,44 @@ export default function CalculoBonificacaoPage() {
       script.onerror = () => reject(new Error('Failed to load XLSX from CDN'))
       document.body.appendChild(script)
     })
+  }
+
+  const finalizarCalculo = async () => {
+    const usuarioId = user?.id ? Number(user.id) : null
+    if (!runId || !usuarioId || Number.isNaN(usuarioId)) {
+      toast({
+        title: "Não foi possível finalizar",
+        description: "A execução atual não possui identificador ou usuário válido. Recarregue e execute novamente.",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      const response = await fetch("/api/bonificacoes/calculo/finalizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ run_id: runId, usuario_id: usuarioId })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data?.error || "Erro ao finalizar cálculo")
+      }
+
+      await cancelar({ removerDescontos: false })
+
+      toast({
+        title: "Cálculo finalizado",
+        description: data?.message || "Descontos promovidos e resumo encerrado."
+      })
+    } catch (error: any) {
+      console.error("[FINALIZAR] Erro ao finalizar cálculo:", error)
+      toast({
+        title: "Erro",
+        description: error?.message || "Erro ao finalizar cálculo",
+        variant: "destructive"
+      })
+    }
   }
 
   // Normalizações / detecções
@@ -390,6 +435,7 @@ export default function CalculoBonificacaoPage() {
       setDataApuracaoAtual(parsed.dataApuracaoAtual ?? null)
       setIdsDescontosInseridos(parsed.idsDescontosInseridos ?? [])
       setAutoDownloaded(parsed.autoDownloaded ?? false)
+      setRunId(parsed.runId ?? null)
     } catch (error) {
       console.warn("[Persistência cálculo] Falha ao carregar estado persistido:", error)
       window.sessionStorage.removeItem(CALCULO_STORAGE_KEY)
@@ -414,6 +460,7 @@ export default function CalculoBonificacaoPage() {
       dataApuracaoAtual,
       idsDescontosInseridos,
       autoDownloaded,
+      runId,
       timestamp: Date.now()
     }
     try {
@@ -432,7 +479,8 @@ export default function CalculoBonificacaoPage() {
     registradoUnifCom,
     dataApuracaoAtual,
     idsDescontosInseridos,
-    autoDownloaded
+    autoDownloaded,
+    runId
   ])
 
   // Se o usuário for COMERCIAL, não renderizar o conteúdo
@@ -721,6 +769,16 @@ export default function CalculoBonificacaoPage() {
       return
     }
 
+    const usuarioId = user?.id ? Number(user.id) : null
+    if (!usuarioId || Number.isNaN(usuarioId)) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível identificar o usuário logado para iniciar o cálculo.",
+        variant: "destructive"
+      })
+      return
+    }
+
     setExecutando(true)
     setResultado(null)
     setDf4SemPixData([])
@@ -782,7 +840,35 @@ export default function CalculoBonificacaoPage() {
       setProgresso(prev => prev === 0 ? Math.round(progressoEstimado) : prev)
     }, 1000) // Atualizar a cada segundo
 
+    let currentRunId: string | null = null
+
     try {
+      // Iniciar execução para reservar lock e obter run_id
+      const dtReferencia =
+        modo === "periodo"
+          ? (dataInicial || dataFinal || formatDateISO(new Date()))
+          : formatDateISO(new Date())
+
+      const iniciarResponse = await fetch("/api/bonificacoes/calculo/iniciar", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          dt_referencia: dtReferencia,
+          usuario_id: usuarioId,
+          session_id: sessionId
+        })
+      })
+
+      const iniciarData = await iniciarResponse.json()
+      if (!iniciarResponse.ok || !iniciarData?.run_id) {
+        throw new Error(iniciarData?.error || "Não foi possível iniciar o cálculo")
+      }
+
+      currentRunId = iniciarData.run_id
+      setRunId(iniciarData.run_id)
+
       const response = await fetch("/api/bonificacoes/calcular", {
         method: "POST",
         headers: {
@@ -791,7 +877,10 @@ export default function CalculoBonificacaoPage() {
         body: JSON.stringify({
           modo,
           data_inicial: modo === "periodo" ? dataInicial : undefined,
-          data_final: modo === "periodo" ? dataFinal : undefined
+          data_final: modo === "periodo" ? dataFinal : undefined,
+          run_id: currentRunId,
+          session_id: sessionId,
+          usuario_id: usuarioId
         })
       })
 
@@ -898,24 +987,19 @@ export default function CalculoBonificacaoPage() {
       // Precisamos usar data_pagamento que é retornada pelo script Python
       let dataMovimentacaoParaArmazenar: string | null = null
       
-      console.log(`[CALCULO] Verificando data_pagamento no resultado:`, data.data_pagamento)
-      console.log(`[CALCULO] Modo: ${modo}, dataInicial: ${dataInicial}`)
       
       if (data.data_pagamento) {
         // Converter de ISO string para formato YYYY-MM-DD
         const dataPagamentoStr = data.data_pagamento
-        console.log(`[CALCULO] data_pagamento recebido: ${dataPagamentoStr} (tipo: ${typeof dataPagamentoStr})`)
         
         // Se já está no formato YYYY-MM-DD, usar diretamente
         if (typeof dataPagamentoStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dataPagamentoStr)) {
           dataMovimentacaoParaArmazenar = dataPagamentoStr
-          console.log(`[CALCULO] Data já está no formato YYYY-MM-DD: ${dataMovimentacaoParaArmazenar}`)
         } else {
           // Tentar converter de ISO string para formato YYYY-MM-DD
           const dataPagamentoDate = new Date(dataPagamentoStr)
           if (!isNaN(dataPagamentoDate.getTime())) {
             dataMovimentacaoParaArmazenar = formatDateISO(dataPagamentoDate)
-            console.log(`[CALCULO] Data de movimentação (dt_pagamento) capturada do resultado: ${dataMovimentacaoParaArmazenar}`)
           } else {
             console.warn(`[CALCULO] Erro ao converter data_pagamento: ${dataPagamentoStr}`)
           }
@@ -926,7 +1010,6 @@ export default function CalculoBonificacaoPage() {
       
       if (dataMovimentacaoParaArmazenar) {
         setDataApuracaoAtual(dataMovimentacaoParaArmazenar)
-        console.log(`[CALCULO] dataApuracaoAtual definida como: ${dataMovimentacaoParaArmazenar}`)
       } else {
         console.warn(`[CALCULO] Não foi possível capturar data de movimentação. data_pagamento no resultado: ${data.data_pagamento}`)
       }
@@ -937,7 +1020,6 @@ export default function CalculoBonificacaoPage() {
       
       // Inicializar dados das tabelas editáveis
       if (data.unif_bonif) {
-        console.log(`[Unif Bonif] Recebidas ${data.unif_bonif.length} linhas do backend`)
         setUnifBonifData(data.unif_bonif)
       }
       if (data.unif_com) {
@@ -971,6 +1053,20 @@ export default function CalculoBonificacaoPage() {
         description: error.message || "Erro ao executar cálculo",
         variant: "destructive"
       })
+
+      if (currentRunId) {
+        try {
+          await fetch("/api/bonificacoes/calculo/cancelar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ run_id: currentRunId })
+          })
+        } catch (cancelError) {
+          console.warn("[CALCULO] Falha ao cancelar execução após erro:", cancelError)
+        } finally {
+          setRunId(null)
+        }
+      }
     } finally {
       setExecutando(false)
     }
@@ -984,6 +1080,7 @@ export default function CalculoBonificacaoPage() {
     setRegistrando(true)
 
     try {
+      const usuarioId = user?.id ? Number(user.id) : null
       const response = await fetch("/api/bonificacoes/registrar", {
         method: "POST",
         headers: {
@@ -991,7 +1088,11 @@ export default function CalculoBonificacaoPage() {
         },
         body: JSON.stringify({
           exec_id: resultado.exec_id,
-          confirmado: true
+          confirmado: true,
+          run_id: runId,
+          session_id: sessionId,
+          usuario_id: usuarioId,
+          dt_referencia: dataApuracaoAtual
         })
       })
 
@@ -1004,7 +1105,6 @@ export default function CalculoBonificacaoPage() {
       // Armazenar IDs dos descontos inseridos para poder excluir se necessário
       if (data.registros?.idsDescontos && Array.isArray(data.registros.idsDescontos)) {
         setIdsDescontosInseridos(data.registros.idsDescontos)
-        console.log(`[REGISTRAR] IDs dos descontos inseridos: ${data.registros.idsDescontos.join(", ")}`)
       }
 
       toast({
@@ -1031,154 +1131,174 @@ export default function CalculoBonificacaoPage() {
     }
   }
 
-  const cancelar = async () => {
-    // Verificar se há descontos para excluir antes de tentar excluir
-    // Se não houver IDs de descontos inseridos e não houver indicadores de descontos, não precisa excluir nada
-    const temDescontosPorIds = idsDescontosInseridos.length > 0
-    
-    // Verificar se há descontos pelos indicadores (desc_total diferente de zero)
-    let temDescontosPorIndicadores = false
-    if (resultado?.indicadores?.desc_total) {
-      const descTotalStr = resultado.indicadores.desc_total
-      // Remover formatação e converter para número
-      const descTotalNum = parseFloat(descTotalStr.replace(/[^\d,]/g, "").replace(",", "."))
-      temDescontosPorIndicadores = !isNaN(descTotalNum) && descTotalNum !== 0
+  const podeMostrarFinalizar = (() => {
+    if (!runId) return false
+    const temUnifBonif = unifBonifData.length > 0
+    const temUnifCom = unifComData.length > 0
+
+    if (temUnifBonif && temUnifCom) {
+      return registradoUnifBonif && registradoUnifCom
     }
-    
-    // Se não há descontos (nem por IDs nem por indicadores), não precisa excluir nada
-    if (!temDescontosPorIds && !temDescontosPorIndicadores) {
-      console.log("[CANCELAR] Nenhum desconto encontrado para excluir. DataFrame de desconto tem 0 linhas na apuração.")
-      // Continuar com a limpeza de estados sem tentar excluir
+    if (temUnifBonif && !temUnifCom) {
+      return registradoUnifBonif
     }
-    // Priorizar exclusão por IDs se disponíveis (descontos inseridos via API registrar)
-    else if (temDescontosPorIds) {
+    if (!temUnifBonif && temUnifCom) {
+      return registradoUnifCom
+    }
+    return false
+  })()
+
+  const cancelar = async ({ removerDescontos = true }: { removerDescontos?: boolean } = {}) => {
+    if (removerDescontos && runId) {
       try {
-        console.log(`[CANCELAR] Tentando excluir descontos por IDs: ${idsDescontosInseridos.join(", ")}`)
-        const response = await fetch("/api/bonificacoes/excluir-descontos", {
+        await fetch("/api/bonificacoes/calculo/cancelar", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            ids: idsDescontosInseridos
-          })
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ run_id: runId })
         })
-        
-        const responseData = await response.json()
-        
-        if (!response.ok) {
-          throw new Error(responseData.error || "Erro ao excluir descontos")
-        }
-        
-        console.log(`[CANCELAR] Descontos excluídos com sucesso por IDs: ${responseData.registrosExcluidos} registro(s)`)
-        
-        if (responseData.registrosExcluidos > 0) {
-          toast({
-            title: "Descontos excluídos",
-            description: `${responseData.registrosExcluidos} registro(s) de desconto foram excluídos.`,
-          })
-        }
-      } catch (error: any) {
-        console.error("[CANCELAR] Erro ao excluir descontos por IDs:", error)
-        toast({
-          title: "Aviso",
-          description: `Não foi possível excluir os descontos automaticamente: ${error.message || "Erro desconhecido"}`,
-          variant: "destructive"
-        })
-        // Não bloquear o cancelamento se houver erro ao excluir descontos
+      } catch (error) {
+        console.warn("[CANCELAR] Falha ao cancelar execução no backend:", error)
       }
-    } 
-    // Fallback: exclusão por data (para descontos inseridos pelo script Python antes do registro)
-    else if (temDescontosPorIndicadores) {
-      // Salvar dataApuracaoAtual antes de limpar estados (ela contém dt_movimentacao/dt_pagamento)
-      let dataMovimentacaoParaExcluir = dataApuracaoAtual
+    } else if (removerDescontos) {
+      // Verificar se há descontos para excluir antes de tentar excluir
+      // Se não houver IDs de descontos inseridos e não houver indicadores de descontos, não precisa excluir nada
+      const temDescontosPorIds = idsDescontosInseridos.length > 0
       
-      console.log(`[CANCELAR] dataApuracaoAtual atual: ${dataApuracaoAtual}`)
-      console.log(`[CANCELAR] resultado existe: ${!!resultado}`)
+      // Verificar se há descontos pelos indicadores (desc_total diferente de zero)
+      let temDescontosPorIndicadores = false
+      if (resultado?.indicadores?.desc_total) {
+        const descTotalStr = resultado.indicadores.desc_total
+        // Remover formatação e converter para número
+        const descTotalNum = parseFloat(descTotalStr.replace(/[^\d,]/g, "").replace(",", "."))
+        temDescontosPorIndicadores = !isNaN(descTotalNum) && descTotalNum !== 0
+      }
       
-      // Se não houver dataApuracaoAtual, tentar extrair do resultado
-      if (!dataMovimentacaoParaExcluir && resultado) {
-        // Tentar extrair data_pagamento do resultado
-        const resultadoComData = resultado as any
-        if (resultadoComData.data_pagamento) {
-          const dataPagamentoStr = resultadoComData.data_pagamento
-          console.log(`[CANCELAR] Tentando extrair data_pagamento do resultado: ${dataPagamentoStr}`)
+      // Se não há descontos (nem por IDs nem por indicadores), não precisa excluir nada
+      if (!temDescontosPorIds && !temDescontosPorIndicadores) {
+        // Continuar com a limpeza de estados sem tentar excluir
+      }
+      // Priorizar exclusão por IDs se disponíveis (descontos inseridos via API registrar)
+      else if (temDescontosPorIds) {
+        try {
+          const response = await fetch("/api/bonificacoes/excluir-descontos", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              ids: idsDescontosInseridos
+            })
+          })
           
-          const dataPagamentoDate = new Date(dataPagamentoStr)
-          if (!isNaN(dataPagamentoDate.getTime())) {
-            dataMovimentacaoParaExcluir = formatDateISO(dataPagamentoDate)
-            console.log(`[CANCELAR] Data extraída do resultado: ${dataMovimentacaoParaExcluir}`)
+          const responseData = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(responseData.error || "Erro ao excluir descontos")
           }
-        }
-        
-        // Se ainda não encontrou, tentar extrair de unif_bonif ou unif_com (dt_pagamento)
-        if (!dataMovimentacaoParaExcluir && unifBonifData.length > 0) {
-          const primeiraLinha = unifBonifData[0]
-          if (primeiraLinha.dt_pagamento) {
-            const dtPagamentoStr = primeiraLinha.dt_pagamento
-            const dtPagamentoDate = new Date(dtPagamentoStr)
-            if (!isNaN(dtPagamentoDate.getTime())) {
-              dataMovimentacaoParaExcluir = formatDateISO(dtPagamentoDate)
-              console.log(`[CANCELAR] Data extraída de unif_bonif: ${dataMovimentacaoParaExcluir}`)
-            }
+          
+          
+          if (responseData.registrosExcluidos > 0) {
+            toast({
+              title: "Descontos excluídos",
+              description: `${responseData.registrosExcluidos} registro(s) de desconto foram excluídos.`,
+            })
           }
-        }
-      }
-      
-      // Se houver data de movimentação, tentar excluir descontos registrados
-      if (dataMovimentacaoParaExcluir) {
-        // Validar formato da data (deve ser YYYY-MM-DD)
-        const dataRegex = /^\d{4}-\d{2}-\d{2}$/
-        if (!dataRegex.test(dataMovimentacaoParaExcluir)) {
-          console.error(`[CANCELAR] Formato de data inválido: ${dataMovimentacaoParaExcluir}. Esperado: YYYY-MM-DD`)
+        } catch (error: any) {
+          console.error("[CANCELAR] Erro ao excluir descontos por IDs:", error)
           toast({
             title: "Aviso",
-            description: `Formato de data inválido para exclusão de descontos: ${dataMovimentacaoParaExcluir}`,
+            description: `Não foi possível excluir os descontos automaticamente: ${error.message || "Erro desconhecido"}`,
             variant: "destructive"
           })
-        } else {
-          try {
-            console.log(`[CANCELAR] Tentando excluir descontos para dt_movimentacao: ${dataMovimentacaoParaExcluir} (formato: YYYY-MM-DD)`)
-            const response = await fetch("/api/bonificacoes/excluir-descontos", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json"
-              },
-              body: JSON.stringify({
-                dt_movimentacao: dataMovimentacaoParaExcluir
-              })
-            })
+          // Não bloquear o cancelamento se houver erro ao excluir descontos
+        }
+      } 
+      // Fallback: exclusão por data (para descontos inseridos pelo script Python antes do registro)
+      else if (temDescontosPorIndicadores) {
+        // Salvar dataApuracaoAtual antes de limpar estados (ela contém dt_movimentacao/dt_pagamento)
+        let dataMovimentacaoParaExcluir = dataApuracaoAtual
+        
+        
+        // Se não houver dataApuracaoAtual, tentar extrair do resultado
+        if (!dataMovimentacaoParaExcluir && resultado) {
+          // Tentar extrair data_pagamento do resultado
+          const resultadoComData = resultado as any
+          if (resultadoComData.data_pagamento) {
+            const dataPagamentoStr = resultadoComData.data_pagamento
             
-            const responseData = await response.json()
-            
-            if (!response.ok) {
-              throw new Error(responseData.error || "Erro ao excluir descontos")
+            const dataPagamentoDate = new Date(dataPagamentoStr)
+            if (!isNaN(dataPagamentoDate.getTime())) {
+              dataMovimentacaoParaExcluir = formatDateISO(dataPagamentoDate)
             }
-            
-            console.log(`[CANCELAR] Descontos excluídos com sucesso: ${responseData.registrosExcluidos} registro(s)`)
-            
-            if (responseData.registrosExcluidos > 0) {
-              toast({
-                title: "Descontos excluídos",
-                description: `${responseData.registrosExcluidos} registro(s) de desconto foram excluídos.`,
-              })
-            } else {
-              console.warn(`[CANCELAR] Nenhum registro foi excluído. Verifique os logs do servidor.`)
+          }
+          
+          // Se ainda não encontrou, tentar extrair de unif_bonif ou unif_com (dt_pagamento)
+          if (!dataMovimentacaoParaExcluir && unifBonifData.length > 0) {
+            const primeiraLinha = unifBonifData[0]
+            if (primeiraLinha.dt_pagamento) {
+              const dtPagamentoStr = primeiraLinha.dt_pagamento
+              const dtPagamentoDate = new Date(dtPagamentoStr)
+              if (!isNaN(dtPagamentoDate.getTime())) {
+                dataMovimentacaoParaExcluir = formatDateISO(dtPagamentoDate)
+              }
             }
-          } catch (error: any) {
-            console.error("[CANCELAR] Erro ao excluir descontos:", error)
-            toast({
-              title: "Aviso",
-              description: `Não foi possível excluir os descontos automaticamente: ${error.message || "Erro desconhecido"}`,
-              variant: "destructive"
-            })
-            // Não bloquear o cancelamento se houver erro ao excluir descontos
           }
         }
-      } else {
-        console.warn("[CANCELAR] Nenhuma data de movimentação encontrada para excluir descontos")
-        console.warn(`[CANCELAR] dataApuracaoAtual é: ${dataApuracaoAtual}`)
+        
+        // Se houver data de movimentação, tentar excluir descontos registrados
+        if (dataMovimentacaoParaExcluir) {
+          // Validar formato da data (deve ser YYYY-MM-DD)
+          const dataRegex = /^\d{4}-\d{2}-\d{2}$/
+          if (!dataRegex.test(dataMovimentacaoParaExcluir)) {
+            console.error(`[CANCELAR] Formato de data inválido: ${dataMovimentacaoParaExcluir}. Esperado: YYYY-MM-DD`)
+            toast({
+              title: "Aviso",
+              description: `Formato de data inválido para exclusão de descontos: ${dataMovimentacaoParaExcluir}`,
+              variant: "destructive"
+            })
+          } else {
+            try {
+              const response = await fetch("/api/bonificacoes/excluir-descontos", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  dt_movimentacao: dataMovimentacaoParaExcluir
+                })
+              })
+              
+              const responseData = await response.json()
+              
+              if (!response.ok) {
+                throw new Error(responseData.error || "Erro ao excluir descontos")
+              }
+              
+              
+              if (responseData.registrosExcluidos > 0) {
+                toast({
+                  title: "Descontos excluídos",
+                  description: `${responseData.registrosExcluidos} registro(s) de desconto foram excluídos.`,
+                })
+              } else {
+                console.warn(`[CANCELAR] Nenhum registro foi excluído. Verifique os logs do servidor.`)
+              }
+            } catch (error: any) {
+              console.error("[CANCELAR] Erro ao excluir descontos:", error)
+              toast({
+                title: "Aviso",
+                description: `Não foi possível excluir os descontos automaticamente: ${error.message || "Erro desconhecido"}`,
+                variant: "destructive"
+              })
+              // Não bloquear o cancelamento se houver erro ao excluir descontos
+            }
+          }
+        } else {
+          console.warn("[CANCELAR] Nenhuma data de movimentação encontrada para excluir descontos")
+          console.warn(`[CANCELAR] dataApuracaoAtual é: ${dataApuracaoAtual}`)
+        }
       }
+    } else {
     }
     
     // Limpar todos os estados
@@ -1198,6 +1318,7 @@ export default function CalculoBonificacaoPage() {
     setRegistradoUnifBonif(false)
     setRegistradoUnifCom(false)
     setIdsDescontosInseridos([])
+    setRunId(null)
   }
 
   // Função para aplicar unidecode em todos os campos de texto dos dados
@@ -2274,32 +2395,12 @@ export default function CalculoBonificacaoPage() {
           )}
 
           {/* Botão Fechar Resumo - aparece quando todas as tabelas disponíveis foram registradas */}
-          {resultado && (() => {
-            const temUnifBonif = unifBonifData.length > 0
-            const temUnifCom = unifComData.length > 0
-            
-            // Se tem ambas as tabelas, ambas devem estar registradas
-            if (temUnifBonif && temUnifCom) {
-              return registradoUnifBonif && registradoUnifCom
-            }
-            // Se tem apenas unifBonif, deve estar registrada
-            if (temUnifBonif && !temUnifCom) {
-              return registradoUnifBonif
-            }
-            // Se tem apenas unifCom, deve estar registrada
-            if (!temUnifBonif && temUnifCom) {
-              return registradoUnifCom
-            }
-            // Se não tem nenhuma tabela, não mostrar
-            return false
-          })() && (
+          {podeMostrarFinalizar && (
             <Card className="border shadow-sm bg-white">
               <CardContent className="py-6">
                 <div className="flex justify-center">
                   <Button
-                    onClick={() => {
-                      cancelar()
-                    }}
+                    onClick={finalizarCalculo}
                     variant="outline"
                     className="w-full sm:w-auto"
                     type="button"

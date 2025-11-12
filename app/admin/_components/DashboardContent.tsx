@@ -38,6 +38,7 @@ import {
 } from "recharts"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatDateISO } from "@/lib/date-utils"
+import { useDashboardFilters, type DashboardPapel } from "@/lib/dashboard-filters-store"
 
 // Cores QV (paleta conforme especificado)
 const COLORS_QV = {
@@ -110,14 +111,6 @@ const getCorOperadora = (operadora: string, index: number): string => {
 
 const normalizeTexto = (valor: string) => normalizarNomeOperadora(valor).toLowerCase()
 
-const getPrimeiroDiaMesAtualISO = () => {
-  const hoje = new Date()
-  const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-  return formatDateISO(primeiroDiaMes)
-}
-
-const getHojeISO = () => formatDateISO(new Date())
-
 const fetchNoStore = (input: string, init?: RequestInit) =>
   fetch(input, { ...init, cache: "no-store" })
 
@@ -153,30 +146,32 @@ export default function DashboardContent() {
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
-  // Estados de filtros
-  const [dataInicio, setDataInicio] = useState(() => {
-    const param = searchParams.get("inicio")
-    if (param) return param
-    // Padrão: primeiro dia do mês atual
-    return getPrimeiroDiaMesAtualISO()
-  })
-  const [dataFim, setDataFim] = useState(() => {
-    const param = searchParams.get("fim")
-    if (param) return param
-    // Padrão: data do dia atual
-    return getHojeISO()
-  })
-  const [operadora, setOperadora] = useState(searchParams.get("operadora") || "")
-  const [operadoraQuery, setOperadoraQuery] = useState(searchParams.get("operadora") || "")
+  const searchParamsString = searchParams.toString()
+  const initialFiltersFromUrl = useMemo(() => {
+    if (!searchParamsString) return {}
+    const params = new URLSearchParams(searchParamsString)
+    const entidadesParam = params.get("entidade")
+    const papelParam = params.get("papel") as DashboardPapel | null
+
+    return {
+      dataInicio: params.get("inicio") || undefined,
+      dataFim: params.get("fim") || undefined,
+      operadora: params.get("operadora") || undefined,
+      entidades: entidadesParam ? entidadesParam.split(",").map((ent) => ent.trim()).filter(Boolean) : undefined,
+      papel: papelParam === "corretores" || papelParam === "supervisores" ? papelParam : papelParam === "geral" ? "geral" : undefined,
+    }
+  }, [searchParamsString])
+
+  const { filters, updateFilters, resetFilters } = useDashboardFilters(initialFiltersFromUrl)
+  const { dataInicio, dataFim, operadora, entidades, papel } = filters
+
+  const [operadoraQuery, setOperadoraQuery] = useState(operadora)
+  useEffect(() => {
+    setOperadoraQuery(operadora)
+  }, [operadora])
+
   const [operadoraFocused, setOperadoraFocused] = useState(false)
-  const [entidades, setEntidades] = useState<string[]>(() => {
-    const entidadesParam = searchParams.get("entidade")
-    return entidadesParam ? entidadesParam.split(",") : []
-  })
   const [entidadeSelectKey, setEntidadeSelectKey] = useState(0)
-  const [papel, setPapel] = useState<"geral" | "corretores" | "supervisores">(
-    (searchParams.get("papel") as "geral" | "corretores" | "supervisores") || "geral"
-  )
 
   // Estados de dados
   const [kpis, setKpis] = useState<Kpis | null>(null)
@@ -263,12 +258,11 @@ export default function DashboardContent() {
     if (loadingFiltros) return
 
     if (operadora && !operadorasDisponiveis.includes(operadora)) {
-      setOperadora("")
       setOperadoraQuery("")
-      setEntidades([])
+      updateFilters({ operadora: "", entidades: [] })
       setEntidadeSelectKey(prev => prev + 1)
     }
-  }, [loadingFiltros, operadora, operadorasDisponiveis])
+  }, [loadingFiltros, operadora, operadorasDisponiveis, updateFilters])
 
   // Carregar dados do dashboard
   const loadDashboard = useCallback(async () => {
@@ -491,67 +485,87 @@ export default function DashboardContent() {
   }, [dataFim, dataInicio, loading, isRangeGreaterThan12Months, loadSpecificCharts])
 
   // Atualizar URL quando papel mudar
-  useEffect(() => {
-    const params = new URLSearchParams()
-    if (dataInicio) params.set("inicio", dataInicio)
-    if (dataFim) params.set("fim", dataFim)
-    if (operadora) params.set("operadora", operadora)
-    if (entidades.length > 0) params.set("entidade", entidades.join(","))
-    if (papel) params.set("papel", papel)
+  const buildCanonicalQueryString = (pairs: Array<[string, string]>) =>
+    pairs
+      .filter(([, value]) => value !== undefined && value !== null && value !== "")
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+      .join("&")
 
-    router.replace(`/admin?${params.toString()}`, { scroll: false })
-  }, [dataInicio, dataFim, operadora, entidades, papel, router])
+  useEffect(() => {
+    const nextPairs: Array<[string, string]> = []
+    if (dataInicio) nextPairs.push(["inicio", dataInicio])
+    if (dataFim) nextPairs.push(["fim", dataFim])
+    if (operadora) nextPairs.push(["operadora", operadora])
+    if (entidades.length > 0) nextPairs.push(["entidade", entidades.join(",")])
+    if (papel) nextPairs.push(["papel", papel])
+
+    const currentPairs: Array<[string, string]> = []
+    searchParams.forEach((value, key) => {
+      if (value !== null) {
+        currentPairs.push([key, value])
+      }
+    })
+
+    const newQuery = buildCanonicalQueryString(nextPairs)
+    const currentQuery = buildCanonicalQueryString(currentPairs)
+
+    if (newQuery === currentQuery) {
+      return
+    }
+
+    const nextUrl = newQuery ? `/admin?${newQuery}` : "/admin"
+    router.replace(nextUrl, { scroll: false })
+  }, [dataInicio, dataFim, operadora, entidades, papel, router, searchParams])
 
   useEffect(() => {
     if (loadingFiltros) return
+    if (!entidades.length) return
 
     const entidadesValidas = new Set(entidadesBase)
-    setEntidades(prev => {
-      if (!prev.length) return prev
-      const filtradas = prev.filter(ent => entidadesValidas.has(ent))
-      if (filtradas.length === prev.length && filtradas.every((valor, index) => valor === prev[index])) {
-        return prev
-      }
-      return filtradas
-    })
-  }, [entidadesBase, loadingFiltros])
+    const filtradas = entidades.filter(ent => entidadesValidas.has(ent))
+
+    if (filtradas.length === entidades.length && filtradas.every((valor, index) => valor === entidades[index])) {
+      return
+    }
+
+    updateFilters({ entidades: filtradas })
+  }, [entidadesBase, entidades, loadingFiltros, updateFilters])
 
 
   // Toggle entidade no filtro
-  const toggleEntidade = (entidade: string) => {
-    setEntidades(prev => 
-      prev.includes(entidade) 
-        ? prev.filter(e => e !== entidade)
-        : [...prev, entidade]
-    )
-  }
+  const toggleEntidade = useCallback((entidade: string) => {
+    const jaExiste = entidades.includes(entidade)
+    const next = jaExiste
+      ? entidades.filter(e => e !== entidade)
+      : [...entidades, entidade]
+    updateFilters({ entidades: next })
+  }, [entidades, updateFilters])
 
   const handleOperadoraInputChange = useCallback((value: string) => {
     setOperadoraQuery(value)
 
-    if (!value.trim()) {
+    const trimmed = value.trim()
+    if (!trimmed) {
       if (operadora) {
-        setOperadora("")
+        updateFilters({ operadora: "", entidades: [] })
+        setEntidadeSelectKey(prev => prev + 1)
       }
-      setEntidades([])
-      setEntidadeSelectKey(prev => prev + 1)
       return
     }
 
     if (operadora) {
-      setOperadora("")
-      setEntidades([])
+      updateFilters({ operadora: "", entidades: [] })
       setEntidadeSelectKey(prev => prev + 1)
     }
-  }, [operadora])
+  }, [operadora, updateFilters])
 
   const handleSelectOperadora = useCallback((valor: string) => {
-    setOperadora(valor)
+    updateFilters({ operadora: valor, entidades: [] })
     setOperadoraQuery(valor)
-    setEntidades([])
     setEntidadeSelectKey(prev => prev + 1)
     setOperadoraFocused(false)
-  }, [])
+  }, [updateFilters])
 
   const handleOperadoraKeyDown = useCallback((event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter" && operadoraSuggestions.length > 0) {
@@ -562,15 +576,11 @@ export default function DashboardContent() {
   }, [handleSelectOperadora, operadoraSuggestions])
 
   const clearFilters = useCallback(() => {
-    setDataInicio(getPrimeiroDiaMesAtualISO())
-    setDataFim(getHojeISO())
-    setOperadora("")
+    resetFilters()
     setOperadoraQuery("")
     setOperadoraFocused(false)
-    setEntidades([])
     setEntidadeSelectKey(prev => prev + 1)
-    setPapel("geral")
-  }, [])
+  }, [resetFilters])
 
 
   return (
@@ -597,7 +607,7 @@ export default function DashboardContent() {
                 id="data-inicio"
                 type="date"
                 value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
+                onChange={(e) => updateFilters({ dataInicio: e.target.value })}
                 className="w-full"
               />
             </div>
@@ -607,7 +617,7 @@ export default function DashboardContent() {
                 id="data-fim"
                 type="date"
                 value={dataFim}
-                onChange={(e) => setDataFim(e.target.value)}
+                onChange={(e) => updateFilters({ dataFim: e.target.value })}
                 className="w-full"
               />
             </div>
@@ -660,7 +670,7 @@ export default function DashboardContent() {
                 key={entidadeSelectKey}
                 onValueChange={(val) => {
                   if (val && val !== "__no-entidade" && !entidades.includes(val)) {
-                    setEntidades(prev => [...prev, val])
+                    updateFilters({ entidades: [...entidades, val] })
                   }
                   setEntidadeSelectKey(prev => prev + 1)
                 }}
@@ -979,10 +989,6 @@ export default function DashboardContent() {
                   >
                     {porOperadora.map((entry, index) => {
                       const cor = getCorOperadora(entry.operadora, index)
-                      // Debug: log apenas se não encontrar match exato
-                      if (cor === "#002f67") {
-                        console.log("Operadora não encontrada:", entry.operadora, "Normalizado:", normalizarNomeOperadora(entry.operadora))
-                      }
                       return (
                         <Cell 
                           key={`cell-${index}`} 

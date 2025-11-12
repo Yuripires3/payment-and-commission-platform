@@ -4,79 +4,56 @@ import * as XLSX from "xlsx"
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const execId = searchParams.get("exec_id") || ""
-    const format = (searchParams.get("format") || "xlsx").toLowerCase()
-
-    console.log(`[DF5 Route] Request received - exec_id: ${execId}, format: ${format}`)
+    const { searchParams } = request.nextUrl
+    const execId = searchParams.get("exec_id")
+    const format = searchParams.get("format") || "json"
 
     if (!execId) {
-      console.log("[DF5 Route] Missing exec_id parameter")
-      return NextResponse.json({ error: "Parâmetro exec_id é obrigatório" }, { status: 400 })
+      return NextResponse.json(
+        { error: "Parâmetro exec_id é obrigatório" },
+        { status: 400 }
+      )
     }
 
-    const data = getCalculoResult(execId)
-    if (!data) {
-      console.log(`[DF5 Route] exec_id not found in cache: ${execId}`)
-      return NextResponse.json({ 
-        error: "exec_id não encontrado ou expirado",
-        exec_id: execId,
-        hint: "Certifique-se de que o cálculo foi concluído e o exec_id é válido"
-      }, { 
-        status: 404,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8'
-        }
-      })
+    const cacheEntry = getCalculoResult(execId)
+    if (!cacheEntry) {
+      return NextResponse.json(
+        { error: "Execução não encontrada. Tente novamente mais tarde." },
+        { status: 404 }
+      )
     }
 
-    const df5 = data.df5 || []
-    if (!Array.isArray(df5) || df5.length === 0) {
-      console.log(`[DF5 Route] df5 is empty for exec_id: ${execId}`)
-      return NextResponse.json({ 
-        error: "df5 vazio para este exec_id",
-        exec_id: execId,
-        hint: "O cálculo pode não ter gerado dados df5"
-      }, { 
-        status: 404,
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8'
-        }
-      })
+    const { df5 } = cacheEntry
+    if (!df5 || !Array.isArray(df5) || df5.length === 0) {
+      return NextResponse.json(
+        { error: "Nenhum dado disponível para df5" },
+        { status: 404 }
+      )
     }
 
-    console.log(`[DF5 Route] Generating ${format} file with ${df5.length} rows for exec_id: ${execId}`)
-
-    if (format === "csv") {
-      // CSV
-      const ws = XLSX.utils.json_to_sheet(df5)
-      const csv = XLSX.utils.sheet_to_csv(ws, { FS: ",", RS: "\n" })
-      const fileName = `df5_${execId}.csv`
-      return new NextResponse(csv, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename=${fileName}`,
-        },
-      })
+    if (format === "json") {
+      return NextResponse.json({ execId, rows: df5 })
     }
 
-    // XLSX (padrão)
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(df5)
-    XLSX.utils.book_append_sheet(wb, ws, "df5")
-    const out = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-    const fileName = `df5_${execId}.xlsx`
-    return new NextResponse(Buffer.from(out), {
+    const worksheet = XLSX.utils.json_to_sheet(df5)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "df5")
+
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" })
+
+    return new NextResponse(buffer, {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename=${fileName}`,
-        "Cache-Control": "no-store",
+        "Content-Disposition": `attachment; filename=df5_${execId}.xlsx`,
       },
     })
-  } catch (error: any) {
-    return NextResponse.json({ error: error?.message || "Erro ao gerar df5" }, { status: 500 })
+  } catch (error) {
+    console.error("[DF5 Route] Error exporting df5:", error)
+    return NextResponse.json(
+      { error: "Erro ao gerar o arquivo" },
+      { status: 500 }
+    )
   }
 }
 

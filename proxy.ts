@@ -16,7 +16,6 @@ export async function proxy(request: NextRequest) {
     const token = request.cookies.get("token")?.value
 
     if (!token) {
-      console.log("[Auth] No token, redirecting to login")
       return NextResponse.redirect(new URL("/login", request.url))
     }
 
@@ -29,10 +28,8 @@ export async function proxy(request: NextRequest) {
         return NextResponse.redirect(new URL("/admin", request.url))
       }
 
-      console.log("[Auth] Access granted for:", payload.role)
       return NextResponse.next()
     } catch (error) {
-      console.log("[Auth] Token verification failed, redirecting to login")
       const response = NextResponse.redirect(new URL("/login", request.url))
       response.cookies.delete("token")
       return response

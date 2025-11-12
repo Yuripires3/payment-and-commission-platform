@@ -547,8 +547,6 @@ export default function RegrasPage() {
         produto: formData.produto
       }
 
-      console.log("Dados a serem enviados:", payload)
-
       // Chamada para API
       const response = await fetch('/api/bonificacoes/regras', {
         method: 'POST',
@@ -570,7 +568,6 @@ export default function RegrasPage() {
       }
 
       const result = await response.json()
-      console.log("Resposta da API:", result)
 
       toast({
         title: "Sucesso!",

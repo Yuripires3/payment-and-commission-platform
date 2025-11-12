@@ -20,8 +20,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
-    console.log("[Auth] Login attempt:", { login: login.substring(0, 3) + "***" })
-
     // Conectar ao banco
     connection = await getDBConnection()
 
@@ -36,7 +34,6 @@ export async function POST(request: NextRequest) {
     const userArray = users as any[]
 
     if (userArray.length === 0) {
-      console.log("[Auth] Login failed: User not found", { searchedFor: login.trim() })
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
@@ -63,15 +60,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!passwordMatch) {
-      console.log("[Auth] Login failed: Invalid password for user:", user.usuario_login)
       return NextResponse.json({ error: "Credenciais inválidas" }, { status: 401 })
     }
 
     // Determinar role pela coluna 'classificacao' (ADMIN/USER)
     const isAdmin = String(user.classificacao || "").toUpperCase() === "ADMIN"
     const role: "admin" | "user" = isAdmin ? "admin" : "user"
-
-    console.log("[Auth] Login successful for user:", user.usuario_login, "role:", role)
 
     // Create JWT token (per-boot secret to force re-login after server restart)
     const secret = getRuntimeJwtSecret()

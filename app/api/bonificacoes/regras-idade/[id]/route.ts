@@ -36,10 +36,6 @@ export async function PUT(
   try {
     const body = await request.json().catch(() => ({}))
     const { id } = await params
-    
-    console.log("=== PUT /api/bonificacoes/regras-idade/[id] ===")
-    console.log("ID:", id)
-    console.log("Body recebido:", JSON.stringify(body, null, 2))
 
     // Verificar variáveis de ambiente
     if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
@@ -152,13 +148,8 @@ export async function PUT(
     values.push(id)
 
     const sql = `UPDATE registro_bonificacao_idades SET ${setClauses.join(", ")} WHERE id = ?`
-    
-    console.log("SQL UPDATE:", sql)
-    console.log("Values:", values)
 
     const [result] = await connection.execute(sql, values)
-
-    console.log("Update result:", result)
 
     // Buscar dados atualizados
     const [updatedRows] = await connection.execute(

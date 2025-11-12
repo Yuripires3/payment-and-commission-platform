@@ -1,4 +1,4 @@
-export interface DateParts {
+interface DateParts {
   year: number
   month: number
   day: number

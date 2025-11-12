@@ -487,8 +487,6 @@ export default function RegrasIdadePage() {
           chaveFaixa: chaveFaixa || null
         }
         
-        console.log(`Enviando linha ${idx + 1}:`, payload)
-        
         const res = await fetch('/api/bonificacoes/regras-idade', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -620,8 +618,6 @@ export default function RegrasIdadePage() {
         chaveFaixa: formData.chaveFaixa || null
       }
 
-      console.log("Dados a serem enviados:", payload)
-
       // Chamada para API
       const response = await fetch('/api/bonificacoes/regras-idade', {
         method: 'POST',
@@ -643,7 +639,6 @@ export default function RegrasIdadePage() {
       }
 
       const result = await response.json()
-      console.log("Resposta da API:", result)
 
       toast({
         title: "Sucesso!",

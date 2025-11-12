@@ -634,8 +634,6 @@ export function RegrasTable({ readOnly = false, title = "Gerenciamento de Regras
   }
 
   const deleteRow = async (id: any) => {
-    console.log("deleteRow called with ID:", id, "Type:", typeof id)
-    
     // Garantir que o ID seja um número válido
     const numericId = Number(id)
     if (!numericId || Number.isNaN(numericId)) {
@@ -653,7 +651,6 @@ export function RegrasTable({ readOnly = false, title = "Gerenciamento de Regras
     }
 
     try {
-      console.log("Making DELETE request to:", `/api/bonificacoes/regras/${numericId}`)
       const response = await fetch(`/api/bonificacoes/regras/${numericId}`, {
         method: 'DELETE',
       })
@@ -736,7 +733,6 @@ export function RegrasTable({ readOnly = false, title = "Gerenciamento de Regras
           }
           
           changedFields[key] = normalizedValue
-          console.log(`Field changed ${key}: "${oldStr}" -> "${newStr}"`)
         }
       }
     })
@@ -766,12 +762,6 @@ export function RegrasTable({ readOnly = false, title = "Gerenciamento de Regras
     // Adicionar o id no início
     const finalPayload = { id: editedData.id, ...cleanFields }
     
-    console.log("=== Payload to send ===")
-    console.log("Changed fields:", changedFields)
-    console.log("Clean fields:", cleanFields)
-    console.log("Final payload:", finalPayload)
-    console.log("JSON:", JSON.stringify(finalPayload, (key, value) => value === undefined ? null : value))
-    
     setLoading(true)
     try {
       const response = await fetch(`/api/bonificacoes/regras/${editedData.id}`, {
@@ -779,8 +769,6 @@ export function RegrasTable({ readOnly = false, title = "Gerenciamento de Regras
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalPayload)
       })
-
-      console.log("Response status:", response.status)
 
       if (!response.ok) {
         let errorMessage = 'Erro ao salvar alterações'
@@ -796,7 +784,6 @@ export function RegrasTable({ readOnly = false, title = "Gerenciamento de Regras
       }
 
       const result = await response.json()
-      console.log("Success response:", result)
 
       toast({
         title: "Sucesso",

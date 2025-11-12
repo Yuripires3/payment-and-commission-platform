@@ -14,6 +14,7 @@ import { canCreateRules, canDeleteRules } from "@/lib/permissions"
 import { signalPageLoaded } from "@/components/ui/page-loading"
 import { formatCurrency } from "@/utils/bonificacao"
 import { formatDateBR, formatDateISO } from "@/lib/date-utils"
+import { usePersistentState } from "@/hooks/usePersistentState"
 
 interface ExtratoDescontosData {
   dt_apuracao?: string
@@ -51,6 +52,17 @@ interface ApiResponse {
   error?: string
 }
 
+type ExtratoFilters = {
+  cpf: string
+  nome: string
+}
+
+const FILTER_STORAGE_KEY = "admin-extrato-descontos"
+const createEmptyFilters = (): ExtratoFilters => ({
+  cpf: "",
+  nome: "",
+})
+
 export default function ExtratoDescontosPage() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -83,10 +95,14 @@ export default function ExtratoDescontosPage() {
   const isInitialLoad = useRef(true)
 
   // Filtros
-  const [filters, setFilters] = useState({
-    cpf: "",
-    nome: ""
-  })
+  const [pendingFilters, setPendingFilters] = usePersistentState<ExtratoFilters>(
+    `${FILTER_STORAGE_KEY}:pending`,
+    createEmptyFilters
+  )
+  const [appliedFilters, setAppliedFilters] = usePersistentState<ExtratoFilters>(
+    `${FILTER_STORAGE_KEY}:applied`,
+    createEmptyFilters
+  )
 
   // Estados para autocomplete de CPF
   const [cpfQuery, setCpfQuery] = useState("")
@@ -101,8 +117,8 @@ export default function ExtratoDescontosPage() {
       params.append("page", page.toString())
       params.append("pageSize", pageSize.toString())
 
-      if (filters.cpf) params.append("cpf", filters.cpf)
-      if (filters.nome) params.append("nome", filters.nome)
+      if (appliedFilters.cpf) params.append("cpf", appliedFilters.cpf)
+      if (appliedFilters.nome) params.append("nome", appliedFilters.nome)
 
       const response = await fetch(`/api/bonificacoes/extrato-descontos?${params}`)
       
@@ -154,12 +170,11 @@ export default function ExtratoDescontosPage() {
   }, [])
 
   useEffect(() => {
-    // Recarrega dados quando page ou filters mudarem (não na inicialização)
     if (!isInitialLoad.current) {
       fetchData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, filters.cpf, filters.nome])
+  }, [page, appliedFilters.cpf, appliedFilters.nome])
 
   // Buscar sugestões de CPF com debounce
   useEffect(() => {
@@ -187,23 +202,41 @@ export default function ExtratoDescontosPage() {
     return () => clearTimeout(timer)
   }, [cpfQuery])
 
-  // Sincronizar cpfQuery quando filters.cpf mudar externamente (ex: limpar filtros)
+  // Sincronizar cpfQuery quando os filtros são limpos externamente
   useEffect(() => {
-    if (!filters.cpf && cpfQuery && !cpfFocused) {
+    if (!pendingFilters.cpf && !appliedFilters.cpf && cpfQuery && !cpfFocused) {
       setCpfQuery("")
     }
-  }, [filters.cpf])
+  }, [pendingFilters.cpf, appliedFilters.cpf, cpfQuery, cpfFocused])
 
-  const handleFilterChange = (key: string, value: string) => {
-    setFilters(prev => ({ ...prev, [key]: value }))
-    setPage(1) // Reset para primeira página ao filtrar
+  const handleFilterChange = (key: keyof ExtratoFilters, value: string) => {
+    setPendingFilters(prev => ({
+      ...prev,
+      [key]: value,
+    }))
+  }
+
+  const applyFilters = (override?: Partial<ExtratoFilters>) => {
+    const nextCpf = (override?.cpf ?? pendingFilters.cpf)?.replace(/\D/g, "") || ""
+    const nextNome = (override?.nome ?? pendingFilters.nome)?.trim() || ""
+    const changed = nextCpf !== appliedFilters.cpf || nextNome !== appliedFilters.nome
+
+    setPendingFilters(prev => ({
+      cpf: override?.cpf ?? prev.cpf,
+      nome: override?.nome ?? prev.nome,
+    }))
+
+    if (!changed) {
+      return
+    }
+
+    setAppliedFilters({ cpf: nextCpf, nome: nextNome })
+    setPage(1)
   }
 
   const clearFilters = () => {
-    setFilters({
-      cpf: "",
-      nome: ""
-    })
+    setPendingFilters(createEmptyFilters())
+    setAppliedFilters(createEmptyFilters())
     setCpfQuery("")
     setPage(1)
   }
@@ -280,12 +313,13 @@ export default function ExtratoDescontosPage() {
 
       // Se houver CPF no formulário e não houver filtros aplicados, aplicar o filtro automaticamente
       const cpfForm = formData.cpf.replace(/\D/g, "")
-      if (cpfForm && !filters.cpf) {
-        setFilters(prev => ({ ...prev, cpf: cpfForm }))
+      if (cpfForm && !pendingFilters.cpf) {
+        setPendingFilters(prev => ({ ...prev, cpf: cpfForm }))
         setCpfQuery(formatCpf(cpfForm))
-        if (formData.nome && !filters.nome) {
-          setFilters(prev => ({ ...prev, nome: formData.nome }))
+        if (formData.nome && !pendingFilters.nome) {
+          setPendingFilters(prev => ({ ...prev, nome: formData.nome }))
         }
+        applyFilters({ cpf: cpfForm, nome: formData.nome || pendingFilters.nome })
       }
       
       // Resetar página para 1 e forçar atualização
@@ -366,8 +400,8 @@ export default function ExtratoDescontosPage() {
       params.append("page", "1")
       params.append("pageSize", "100") // Máximo permitido pela API
 
-      if (filters.cpf) params.append("cpf", filters.cpf)
-      if (filters.nome) params.append("nome", filters.nome)
+      if (appliedFilters.cpf) params.append("cpf", appliedFilters.cpf)
+      if (appliedFilters.nome) params.append("nome", appliedFilters.nome)
 
       const firstResponse = await fetch(`/api/bonificacoes/extrato-descontos?${params}`)
       
@@ -393,8 +427,8 @@ export default function ExtratoDescontosPage() {
             pageParams.append("page", pageNum.toString())
             pageParams.append("pageSize", "100")
 
-            if (filters.cpf) pageParams.append("cpf", filters.cpf)
-            if (filters.nome) pageParams.append("nome", filters.nome)
+            if (appliedFilters.cpf) pageParams.append("cpf", appliedFilters.cpf)
+            if (appliedFilters.nome) pageParams.append("nome", appliedFilters.nome)
 
             try {
               const response = await fetch(`/api/bonificacoes/extrato-descontos?${pageParams}`)
@@ -426,7 +460,7 @@ export default function ExtratoDescontosPage() {
     if (exporting) return
     
     // Verificar se há filtros aplicados
-    if (!filters.cpf && !filters.nome) {
+    if (!appliedFilters.cpf && !appliedFilters.nome) {
       toast({
         title: "Filtros necessários",
         description: "É necessário aplicar pelo menos um filtro (CPF ou Nome) para exportar.",
@@ -462,13 +496,13 @@ export default function ExtratoDescontosPage() {
 
       // Linha 1: CPF
       const row1: any[] = []
-      const cpfValue = filters.cpf ? formatCpf(filters.cpf) : ""
+      const cpfValue = appliedFilters.cpf ? formatCpf(appliedFilters.cpf) : ""
       row1.push(`CPF: ${cpfValue}`)
       excelData.push(row1)
 
       // Linha 2: Nome
       const row2: any[] = []
-      const nomeValue = filters.nome || ""
+      const nomeValue = appliedFilters.nome || ""
       row2.push(`NOME: ${nomeValue}`)
       excelData.push(row2)
       excelData.push([]) // Linha em branco
@@ -698,9 +732,9 @@ export default function ExtratoDescontosPage() {
                   Nova Movimentação
                 </Button>
               )}
-              <Button 
+                  <Button 
                 onClick={exportToXLSX} 
-                disabled={exporting || total === 0 || (!filters.cpf && !filters.nome)}
+                disabled={exporting || total === 0 || (!appliedFilters.cpf && !appliedFilters.nome)}
                 variant="outline"
               >
                 <Download className="h-4 w-4 mr-2" />
@@ -726,11 +760,15 @@ export default function ExtratoDescontosPage() {
                       <Input
                         id="filter_cpf"
                         placeholder="Buscar por CPF..."
-                        value={cpfFocused ? cpfQuery : (filters.cpf ? formatCpf(filters.cpf) : cpfQuery)}
+                        value={
+                          cpfFocused
+                            ? cpfQuery
+                            : (pendingFilters.cpf ? formatCpf(pendingFilters.cpf) : cpfQuery)
+                        }
                         onFocus={() => {
                           setCpfFocused(true)
-                          if (filters.cpf) {
-                            setCpfQuery(formatCpf(filters.cpf))
+                          if (pendingFilters.cpf) {
+                            setCpfQuery(formatCpf(pendingFilters.cpf))
                           }
                         }}
                         onBlur={() => setTimeout(() => setCpfFocused(false), 150)}
@@ -743,7 +781,7 @@ export default function ExtratoDescontosPage() {
                         }}
                         className="bg-white"
                       />
-                      {(filters.cpf || cpfQuery) && (
+                      {(pendingFilters.cpf || cpfQuery) && (
                         <button
                           type="button"
                           aria-label="Limpar CPF"
@@ -764,12 +802,17 @@ export default function ExtratoDescontosPage() {
                               key={`${suggestion.cpf}-${idx}`}
                               type="button"
                               onClick={() => {
-                                handleFilterChange("cpf", suggestion.cpf)
-                                if (suggestion.nome) {
-                                  handleFilterChange("nome", suggestion.nome)
-                                }
+                                setPendingFilters(prev => ({
+                                  ...prev,
+                                  cpf: suggestion.cpf,
+                                  nome: suggestion.nome || prev.nome
+                                }))
                                 setCpfQuery(suggestion.formattedCpf)
                                 setCpfFocused(false)
+                                applyFilters({
+                                  cpf: suggestion.cpf,
+                                  nome: suggestion.nome || pendingFilters.nome
+                                })
                               }}
                               className="w-full text-left px-4 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
                             >
@@ -789,7 +832,7 @@ export default function ExtratoDescontosPage() {
                     <Input
                       id="filter_nome"
                       placeholder="Buscar por nome..."
-                      value={filters.nome}
+                      value={pendingFilters.nome}
                       onChange={(e) => handleFilterChange("nome", e.target.value)}
                       className="bg-white"
                     />

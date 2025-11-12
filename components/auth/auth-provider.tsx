@@ -64,11 +64,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!user && isAdminRoute) {
       // Not logged in, trying to access protected route
-      console.log("[Auth] Not authenticated, redirecting to login")
       router.push("/login")
     } else if (user && (isLoginRoute || isRegisterRoute)) {
       // Already logged in, redirect to admin dashboard
-      console.log("[Auth] Already authenticated, redirecting to admin")
       router.push("/admin")
     }
     // Removed the role-based redirects to prevent loops

@@ -22,11 +22,8 @@ function toSQLDate(date: any): string | null {
 // Converte valores decimais com vírgula/ponto para número real
 // Exemplos: "1200,50" -> 1200.5, "1.200,50" -> 1200.5, "1200.50" -> 1200.5
 function toSQLDecimal(value: any): number | null {
-  console.log(`toSQLDecimal called with value: ${value}, type: ${typeof value}`)
-  
   if (value === undefined || value === null || value === "") return null
   if (typeof value === "number") {
-    console.log(`Value is already a number: ${value}`)
     return value
   }
   
@@ -34,9 +31,7 @@ function toSQLDecimal(value: any): number | null {
   // Ex: "1200,50", "1.200,50" -> converte para número JS 1200.5
   const sanitized = String(value).trim().replace(/\./g, "").replace(",", ".")
   const num = Number(sanitized)
-  
-  console.log(`Sanitized: "${sanitized}" -> ${num}`)
-  
+
   return isNaN(num) ? null : num
 }
 
@@ -56,10 +51,6 @@ export async function PUT(
     if (!id || Number.isNaN(id)) {
       return NextResponse.json({ error: "id inválido" }, { status: 400 })
     }
-
-    console.log("=== PUT /api/bonificacoes/regras/[id] ===")
-    console.log("ID:", id)
-    console.log("Body:", JSON.stringify(body, null, 2))
 
     connection = await getDBConnection()
     await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
@@ -105,8 +96,6 @@ export async function PUT(
       produto: mergedData.produto,
     })
 
-    console.log("Recalculated chave:", chave)
-
     // Monte apenas o que chegou no body para o UPDATE
     const candidate: Record<string, any> = {
       vigencia: body.hasOwnProperty("vigencia") ? toSQLDate(body.vigencia) : undefined,
@@ -128,12 +117,8 @@ export async function PUT(
       chave: chave,
     }
 
-    console.log("Candidate:", candidate)
-
     // Só inclui campos presentes (v !== undefined). NULL é permitido.
     const entries = Object.entries(candidate).filter(([, v]) => v !== undefined)
-    
-    console.log("Filtered entries:", entries)
     
     if (entries.length === 0) {
       return NextResponse.json({ error: "Nenhum campo para atualizar" }, { status: 400 })
@@ -145,12 +130,7 @@ export async function PUT(
 
     const sql = `UPDATE registro_bonificacao_valores_v2 SET ${setSql} WHERE id = ?`
     
-    console.log("SQL:", sql)
-    console.log("Values:", values)
-
     const [result] = await connection.execute(sql, values)
-
-    console.log("Update result:", result)
 
     return NextResponse.json({ ok: true, updated: result })
   } catch (e: any) {
@@ -172,25 +152,14 @@ export async function DELETE(
 ) {
   let connection: any = null
   try {
-    console.log("DELETE request received")
-    
     // Next.js 15+ requires awaiting params
     const params = await context.params
-    console.log("Context params:", params)
-    console.log("Raw ID from params:", params?.id)
-    
-    const idRaw = params?.id
-    console.log("idRaw:", idRaw, "Type:", typeof idRaw)
-    
-    const id = Number(idRaw)
-    console.log("Converted ID:", id, "Type:", typeof id, "isNaN:", Number.isNaN(id))
 
+    const idRaw = params?.id
+    const id = Number(idRaw)
     if (!id || Number.isNaN(id)) {
-      console.log("ID validation failed - returning error")
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
-
-    console.log("Deleting record with ID:", id)
 
     connection = await getDBConnection()
     await connection.execute("SET NAMES 'utf8mb4' COLLATE 'utf8mb4_unicode_ci'")
@@ -201,8 +170,6 @@ export async function DELETE(
       "DELETE FROM registro_bonificacao_valores_v2 WHERE id = ?",
       [id]
     )
-
-    console.log("Delete result:", result)
 
     return NextResponse.json({ ok: true, deleted: result })
   } catch (e: any) {

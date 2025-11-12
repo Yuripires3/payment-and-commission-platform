@@ -28,70 +28,52 @@ export async function POST(request: NextRequest) {
 
     // Exclusão por IDs (prioridade)
     if (ids && ids.length > 0) {
-      console.log(`[EXCLUIR DESCONTOS] Tentando excluir descontos por IDs: ${ids.join(", ")}`)
-      
-      // Verificar quantos registros existem antes de excluir
-      const placeholders = ids.map(() => "?").join(",")
-      const [checkResult] = await connection.execute(
-        `SELECT COUNT(*) as total 
-         FROM registro_bonificacao_descontos 
-         WHERE id IN (${placeholders})`,
-        ids
-      )
-      
-      const totalAntes = (checkResult as any[])[0]?.total || 0
-      console.log(`[EXCLUIR DESCONTOS] Encontrados ${totalAntes} registro(s) antes da exclusão`)
+      if (ids.length === 0) {
+        return NextResponse.json({ ok: false, error: "Nenhum ID fornecido" }, { status: 400 })
+      }
 
-      // Excluir registros por IDs
-      const [result] = await connection.execute(
-        `DELETE FROM registro_bonificacao_descontos 
-         WHERE id IN (${placeholders})`,
-        ids
+      const placeholders = ids.map(() => "?").join(", ")
+      const sql = `DELETE FROM registro_bonificacao_descontos WHERE id IN (${placeholders})`
+      const params = ids
+
+      const [antes] = await connection.execute(
+        `SELECT COUNT(*) AS total FROM registro_bonificacao_descontos WHERE id IN (${placeholders})`,
+        params
       )
 
-      registrosExcluidos = (result as any).affectedRows || 0
-      console.log(`[EXCLUIR DESCONTOS] ${registrosExcluidos} registro(s) excluído(s) por IDs`)
+      const totalAntes = (antes as any[])[0]?.total || 0
+
+      const [result] = await connection.execute(sql, params)
+      const registrosExcluidos = (result as any)?.affectedRows || 0
+
+      return NextResponse.json({ ok: true, registrosExcluidos, totalAntes })
     } 
     // Fallback: exclusão por data (mantido para compatibilidade)
     else if (dt_movimentacao) {
-      console.log(`[EXCLUIR DESCONTOS] Tentando excluir descontos com dt_movimentacao: ${dt_movimentacao} (formato: YYYY-MM-DD)`)
-
-      // Primeiro, verificar quantos registros existem antes de excluir
-      const [checkResult] = await connection.execute(
-        `SELECT COUNT(*) as total 
-         FROM registro_bonificacao_descontos 
-         WHERE DATE(dt_movimentacao) = DATE(?) 
-         AND tipo_movimentacao = 'desconto realizado'`,
-        [dt_movimentacao]
-      )
-      
-      const totalAntes = (checkResult as any[])[0]?.total || 0
-      console.log(`[EXCLUIR DESCONTOS] Encontrados ${totalAntes} registro(s) antes da exclusão`)
-
-      // Se não encontrou nenhum registro, verificar formato dos dados no banco para debug
-      if (totalAntes === 0) {
-        const [checkResult2] = await connection.execute(
-          `SELECT dt_movimentacao, tipo_movimentacao, DATE(dt_movimentacao) as dt_movimentacao_date
-           FROM registro_bonificacao_descontos 
-           WHERE tipo_movimentacao = 'desconto realizado'
-           ORDER BY dt_movimentacao DESC
-           LIMIT 5`,
-          []
-        )
-        console.log(`[EXCLUIR DESCONTOS] Amostra de registros no banco:`, JSON.stringify(checkResult2, null, 2))
-        console.log(`[EXCLUIR DESCONTOS] Data que estamos buscando: ${dt_movimentacao}`)
+      const dtMov = dt_movimentacao.trim()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dtMov)) {
+        return NextResponse.json({ ok: false, error: "Formato de data inválido. Use YYYY-MM-DD" }, { status: 400 })
       }
 
-      // Excluir registros de descontos usando dt_movimentacao e tipo_movimentacao
-      const [result] = await connection.execute(
-        `DELETE FROM registro_bonificacao_descontos 
-         WHERE DATE(dt_movimentacao) = DATE(?) 
-         AND tipo_movimentacao = 'desconto realizado'`,
-        [dt_movimentacao]
+      const [antes] = await connection.execute(
+        "SELECT COUNT(*) AS total FROM registro_bonificacao_descontos WHERE dt_movimentacao = ?",
+        [dtMov]
       )
+      const totalAntes = (antes as any[])[0]?.total || 0
 
-      registrosExcluidos = (result as any).affectedRows || 0
-      console.log(`[EXCLUIR DESCONTOS] ${registrosExcluidos} registro(s) excluído(s) por data`)
+      const sql = "DELETE FROM registro_bonificacao_descontos WHERE dt_movimentacao = ?"
+      const [result] = await connection.execute(sql, [dtMov])
+      const registrosExcluidos = (result as any)?.affectedRows || 0
+
+      if (registrosExcluidos === 0 && process.env.NODE_ENV !== "production") {
+        const [check] = await connection.execute(
+          "SELECT id, dt_movimentacao, status, is_active FROM registro_bonificacao_descontos WHERE dt_movimentacao LIKE ? LIMIT 5",
+          [`${dtMov}%`]
+        )
+        console.warn("[EXCLUIR DESCONTOS] Nenhum registro excluído. Amostra de registros no banco:", JSON.stringify(check, null, 2))
+      }
+
+      return NextResponse.json({ ok: true, registrosExcluidos, totalAntes })
     }
 
     return NextResponse.json({

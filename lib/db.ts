@@ -1,6 +1,6 @@
 import mysql from "mysql2/promise"
 
-export interface DBConfig {
+interface DBConfig {
   host: string
   port: number
   user: string
@@ -16,7 +16,7 @@ if (!process.env.TZ) {
   process.env.TZ = DEFAULT_APP_TIMEZONE
 }
 
-export function getDBConfig(): DBConfig {
+function getDBConfig(): DBConfig {
   if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_PASSWORD || !process.env.DB_NAME) {
     throw new Error("Variáveis de ambiente do banco não configuradas")
   }
@@ -55,17 +55,6 @@ export async function getDBConnection() {
   const config = getDBConfig()
   
   // Log de debug para diagnóstico (apenas em desenvolvimento ou se DB_DEBUG estiver definido)
-  if (process.env.DB_DEBUG === 'true' || process.env.NODE_ENV !== 'production') {
-    console.log('[DB] Tentando conectar:', {
-      host: config.host,
-      port: config.port,
-      user: config.user,
-      database: config.database,
-      timezone: DEFAULT_SESSION_TIMEZONE || DEFAULT_MYSQL_OFFSET,
-      // Não logar senha por segurança
-    })
-  }
-  
   // Adicionar timeout maior para conexões remotas
   // NOTA: acquireTimeout não é válido para createConnection(), apenas para createPool()
   const connectionConfig = {
@@ -86,13 +75,5 @@ export async function getDBConnection() {
  */
 export function getDescontosStatusFilter(): string {
   return "AND status = 'finalizado' AND is_active = TRUE"
-}
-
-/**
- * @deprecated Use getDescontosStatusFilter() diretamente - as colunas sempre existem
- * Mantido apenas para compatibilidade temporária
- */
-export async function hasStagingFields(connection: any): Promise<boolean> {
-  return true // Sempre true - colunas criadas via migration
 }
 

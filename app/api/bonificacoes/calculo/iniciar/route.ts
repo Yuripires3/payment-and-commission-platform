@@ -50,6 +50,30 @@ export async function POST(request: NextRequest) {
 
     connection = await getDBConnection()
 
+    // Garantir que as tabelas de apoio existam
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS locks_calculo (
+        dt_referencia DATE PRIMARY KEY,
+        locked_by BIGINT NOT NULL,
+        locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP NOT NULL,
+        INDEX idx_locks_expires (expires_at)
+      ) ENGINE=InnoDB COMMENT='Locks para controle de concorrência em cálculos'
+    `)
+
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS calculo_sessions (
+        session_id VARCHAR(64) PRIMARY KEY,
+        run_id VARCHAR(36) NOT NULL,
+        usuario_id BIGINT NOT NULL,
+        dt_referencia DATE NOT NULL,
+        last_heartbeat TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_sessions_run_id (run_id),
+        INDEX idx_sessions_heartbeat (last_heartbeat)
+      ) ENGINE=InnoDB COMMENT='Sessões ativas de cálculo para controle de timeout'
+    `)
+
     // Iniciar transação
     await connection.beginTransaction()
 

@@ -111,8 +111,6 @@ export async function GET(request: NextRequest) {
       const [tableCheck]: any = await connection.execute(
         `SHOW TABLES LIKE 'unificado_bonificacao_comercial'`
       )
-      console.log("Tabela existe?", tableCheck.length > 0)
-      
       if (tableCheck.length === 0) {
         return NextResponse.json(
           { error: "Tabela 'unificado_bonificacao_comercial' não encontrada no banco de dados" },
@@ -131,8 +129,6 @@ export async function GET(request: NextRequest) {
     const total = countResult[0]?.total || 0
     const totalPages = Math.ceil(total / pageSize)
     
-    console.log("Total de registros encontrados:", total)
-
     // Buscar dados com paginação
     const offset = (page - 1) * pageSize
     
@@ -164,18 +160,8 @@ export async function GET(request: NextRequest) {
     query += ` ${orderByClause}`
     query += ` LIMIT ${pageSize} OFFSET ${offset}`
     
-    console.log("Query executada:", query)
-    console.log("Parâmetros WHERE:", whereValues)
-    
     try {
       const [rows]: any = await connection.execute(query, whereValues)
-      console.log("Query executada com sucesso. Registros:", rows.length)
-      console.log("Total de registros:", total)
-      
-      // Log do primeiro registro para debug
-      if (rows.length > 0) {
-        console.log("Primeiro registro:", JSON.stringify(rows[0], null, 2))
-      }
 
       return NextResponse.json({
         data: rows || [],

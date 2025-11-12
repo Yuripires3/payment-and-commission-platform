@@ -57,22 +57,12 @@ export async function GET(request: NextRequest) {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(" AND ")}` : ""
 
-    // Log para debug
-    console.log("=== DEBUG API REGRAS ===")
-    console.log("Filtros recebidos:", { operadora, tipo_faixa, produto, pagamento_por, tipo_beneficiario, parcela, entidade, plano, vigencia_inicio, vigencia_fim })
-    console.log("WHERE conditions:", whereConditions)
-    console.log("WHERE values:", whereValues)
-    console.log("WHERE clause:", whereClause)
-    console.log("========================")
-
     // Contar total
     const [countResult] = await connection.execute(
       `SELECT COUNT(*) as total FROM registro_bonificacao_valores_v2 ${whereClause}`,
       whereValues
     )
     const total = (countResult as any[])[0]?.total || 0
-
-    console.log("Total de registros encontrados:", total)
 
     // Paginar
     const offset = (page - 1) * pageSize
@@ -81,11 +71,7 @@ export async function GET(request: NextRequest) {
     // Buscar dados com ordenação fixa múltipla - planos iguais agrupados com Titular antes de Dependente
     let query = `SELECT * FROM registro_bonificacao_valores_v2 ${whereClause} ORDER BY \`vigencia\` DESC, \`registro\` DESC, \`tipo_faixa\` ASC, \`plano\` ASC, \`tipo_beneficiario\` DESC LIMIT ${pageSize} OFFSET ${offset}`
     
-    console.log("Query executada:", query)
-    
     const [rows] = await connection.execute(query, whereValues)
-    
-    console.log("Registros retornados:", (rows as any[]).length)
     
     return NextResponse.json(
       {
@@ -145,9 +131,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
     
-    console.log("=== POST /api/bonificacoes/regras ===")
-    console.log("Body:", JSON.stringify(body, null, 2))
-
     // Validação dos campos obrigatórios
     if (!body.vigencia || !body.operadora || !body.entidade || !body.plano) {
       return NextResponse.json(
@@ -199,13 +182,9 @@ export async function POST(request: NextRequest) {
       produto: normalizedData.produto,
     })
 
-    console.log("Generated chave:", chave)
-
     // Data atual para o campo registro (apenas data, sem hora)
     const now = new Date()
     const registro = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-
-    console.log("Registro (apenas data):", registro)
 
     // Preparar dados para INSERT
     const insertData = {
@@ -221,12 +200,7 @@ export async function POST(request: NextRequest) {
 
     const sql = `INSERT INTO registro_bonificacao_valores_v2 (${columns.map(col => `\`${col}\``).join(", ")}) VALUES (${placeholders})`
     
-    console.log("SQL:", sql)
-    console.log("Values:", values)
-
     const [result] = await connection.execute(sql, values)
-
-    console.log("Insert result:", result)
 
     return NextResponse.json({ 
       ok: true, 

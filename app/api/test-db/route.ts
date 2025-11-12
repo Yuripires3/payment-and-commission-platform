@@ -3,28 +3,15 @@ import { getDBConnection } from "@/lib/db"
 
 export async function GET() {
   try {
-    console.log("=== TESTE DE CONEXÃO COM BANCO ===")
-    console.log("Config:", {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD ? "***" : "MISSING",
-      database: process.env.DB_NAME
-    })
-
     const connection = await getDBConnection()
-
-    console.log("✅ Conexão estabelecida!")
 
     // Testar query simples
     const [rows] = await connection.execute("SELECT 1 as test")
-    console.log("Query test result:", rows)
 
     // Tentar count na tabela
     const [countRows] = await connection.execute(
       "SELECT COUNT(*) as total FROM registro_bonificacao_valores_v2"
     )
-    console.log("Count result:", countRows)
 
     await connection.end()
 

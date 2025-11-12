@@ -62,36 +62,6 @@ export function construirCampoCpfParceiro(
 }
 
 /**
- * Verifica se uma data está no novo modelo (>= 2025-10-01) por dt_analise
- */
-export function isNovoModelo(
-  _dtPagamento: string | null | undefined,
-  dtAnalise?: string | null
-): boolean {
-  const dataRef = dtAnalise
-  if (!dataRef) return false
-  return dataRef >= DATA_CORTE
-}
-
-/**
- * Deriva o papel (corretor/supervisor/indefinido) do nome_supervisor
- */
-export function derivarPapel(nomeSupervisor: string | null | undefined): 'corretor' | 'supervisor' | 'indefinido' {
-  if (!nomeSupervisor) return 'indefinido'
-  const papel = nomeSupervisor.trim().toLowerCase()
-  if (papel === 'corretor' || papel.includes('corretor')) return 'corretor'
-  if (papel === 'supervisor' || papel.includes('supervisor')) return 'supervisor'
-  return 'indefinido'
-}
-
-/**
- * Obtém o nome de exibição (sempre de nome_corretor)
- */
-export function obterNomeExibicao(nomeCorretor: string | null | undefined, cpfCorretor?: string | null): string {
-  return nomeCorretor || cpfCorretor || 'Não informado'
-}
-
-/**
  * Constrói SQL CASE para calcular valor conforme modelo (antigo ou novo)
  * Retorna expressão SQL que soma valores considerando a data de pagamento
  */
@@ -183,28 +153,5 @@ export function construirFiltroPapel(
  */
 export function construirCampoNomeExibicao(alias: string = 'ub'): string {
   return `COALESCE(${alias}.nome_corretor, ${alias}.cpf_corretor, 'Não informado') as nome_exibicao`
-}
-
-/**
- * Constrói SELECT para papel derivado
- */
-export function construirCampoPapel(alias: string = 'ub'): string {
-  const dataReferencia = construirDataReferencia(alias)
-
-  return `CASE 
-    WHEN ${dataReferencia} < '${DATA_CORTE}' THEN
-      CASE 
-        WHEN ${alias}.cpf_corretor IS NOT NULL AND ${alias}.cpf_corretor != '' THEN 'corretor'
-        WHEN ${alias}.cpf_supervisor IS NOT NULL AND ${alias}.cpf_supervisor != '' THEN 'supervisor'
-        ELSE 'indefinido'
-      END
-    WHEN ${dataReferencia} >= '${DATA_CORTE}' THEN
-      CASE 
-        WHEN ${buildRoleMatchExpression(alias, 'corretor')} THEN 'corretor'
-        WHEN ${buildRoleMatchExpression(alias, 'supervisor')} THEN 'supervisor'
-        ELSE 'indefinido'
-      END
-    ELSE 'indefinido'
-  END as papel`
 }
 

@@ -8,6 +8,10 @@ import path from "path"
 interface RegistrarRequest {
   exec_id: string
   confirmado: boolean
+  run_id?: string | null
+  session_id?: string | null
+  usuario_id?: number | null
+  dt_referencia?: string | null
 }
 
 export async function POST(request: NextRequest) {
@@ -15,7 +19,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body: RegistrarRequest = await request.json()
-    const { exec_id, confirmado } = body
+    const { exec_id, confirmado, run_id, session_id, usuario_id, dt_referencia } = body
 
     if (!confirmado) {
       return NextResponse.json(
@@ -142,12 +146,16 @@ export async function POST(request: NextRequest) {
 
     // Inserir descontos em registro_bonificacao_descontos e armazenar IDs
     const idsDescontosInseridos: number[] = []
-    if (resultados.desc && resultados.desc.length > 0) {
-      for (const desc of resultados.desc) {
+    const descontosArray = resultados.desc || []
+    const descontosPossuemRunId = descontosArray.some((desc: any) => desc.run_id)
+
+    if (!descontosPossuemRunId && descontosArray.length > 0) {
+      for (const desc of descontosArray) {
         const [result]: any = await connection.execute(
           `INSERT INTO registro_bonificacao_descontos 
-           (dt_movimentacao, cpf, nome, valor, dt_apuracao, tipo_movimentacao, registro)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           (dt_movimentacao, cpf, nome, valor, dt_apuracao, tipo_movimentacao, registro,
+            run_id, session_id, usuario_id, dt_referencia, status, is_active, chave_negocio, origem)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'staging', FALSE, ?, ?)`,
           [
             desc.dt_movimentacao || null,
             desc.cpf || null,
@@ -155,10 +163,15 @@ export async function POST(request: NextRequest) {
             desc.valor || null,
             desc.dt_apuracao || null,
             desc.tipo_movimentacao || null,
-            desc.registro || null
+            desc.registro || null,
+            run_id || null,
+            session_id || null,
+            usuario_id || null,
+            dt_referencia || null,
+            desc.chave_negocio || null,
+            desc.origem || "registrar_api"
           ]
         )
-        // Armazenar o ID do registro inserido
         if (result.insertId) {
           idsDescontosInseridos.push(result.insertId)
         }

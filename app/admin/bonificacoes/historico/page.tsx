@@ -17,6 +17,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { formatDateBR, formatDateISO, getDateParts } from "@/lib/date-utils"
 import QvLogoImage from "@/logo/qv-beneficios.png"
+import { usePersistentState } from "@/hooks/usePersistentState"
 
 interface HistoricoData {
   id?: number
@@ -79,6 +80,21 @@ interface ApiResponse {
   error?: string
 }
 
+type HistoricoFilters = {
+  cpf: string
+  nome: string
+  tipo_premiado: string
+  dt_pagamento_inicio: string
+}
+
+const HISTORICO_FILTER_STORAGE_KEY = "admin-historico-bonificacoes"
+const createEmptyHistoricoFilters = (): HistoricoFilters => ({
+  cpf: "",
+  nome: "",
+  tipo_premiado: "",
+  dt_pagamento_inicio: ""
+})
+
 export default function HistoricoBonificacoesPage() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -101,12 +117,10 @@ export default function HistoricoBonificacoesPage() {
   const [originalData, setOriginalData] = useState<{ [key: string]: any }>({})
 
   // Filtros
-  const [filters, setFilters] = useState({
-    cpf: "",
-    nome: "",
-    tipo_premiado: "",
-    dt_pagamento_inicio: ""
-  })
+  const [filters, setFilters] = usePersistentState<HistoricoFilters>(
+    `${HISTORICO_FILTER_STORAGE_KEY}:filters`,
+    createEmptyHistoricoFilters
+  )
   
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const [generatingPedidoE, setGeneratingPedidoE] = useState(false)
@@ -219,15 +233,6 @@ export default function HistoricoBonificacoesPage() {
 
       const result: ApiResponse = await response.json()
 
-      console.log("=== DEBUG HISTÓRICO ===")
-      console.log("URL da requisição:", `/api/bonificacoes/historico?${params}`)
-      console.log("Resposta da API:", result)
-      console.log("Dados recebidos:", result.data?.length || 0, "registros")
-      if (result.data && result.data.length > 0) {
-        console.log("Primeiro registro:", result.data[0])
-      }
-      console.log("=========================")
-
       if (result.error) {
         console.error("Erro na resposta:", result.error)
         toast({
@@ -241,19 +246,12 @@ export default function HistoricoBonificacoesPage() {
         return
       }
 
-      console.log("Dados recebidos:", result.data?.length || 0, "registros")
-      console.log("Total de registros:", result.pagination?.total || 0)
-      console.log("Total de páginas:", result.pagination?.totalPages || 0)
-      
       // Garantir que sempre definimos os dados, mesmo que seja um array vazio
       setData(Array.isArray(result.data) ? result.data : [])
       setTotal(result.pagination?.total || 0)
       setTotalPages(result.pagination?.totalPages || 0)
       
       // Se não há dados mas há filtros aplicados, mostrar mensagem informativa
-      if ((result.data?.length || 0) === 0 && (filters.cpf || filters.nome || filters.tipo_premiado || filters.dt_pagamento_inicio)) {
-        console.log("Nenhum resultado encontrado com os filtros aplicados")
-      }
     } catch (error) {
       console.error("Erro ao carregar histórico:", error)
       toast({
@@ -372,18 +370,13 @@ export default function HistoricoBonificacoesPage() {
     }
   }, [filters.cpf, filterCpfFocused])
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key: keyof HistoricoFilters, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }))
     setPage(1) // Reset para primeira página ao filtrar
   }
 
   const clearFilters = () => {
-    setFilters({
-      cpf: "",
-      nome: "",
-      tipo_premiado: "",
-      dt_pagamento_inicio: ""
-    })
+    setFilters(createEmptyHistoricoFilters())
     setFilterCpfQuery("")
     setPage(1)
   }

@@ -667,8 +667,6 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
   }
 
   const deleteRow = async (id: any) => {
-    console.log("deleteRow called with ID:", id, "Type:", typeof id)
-    
     // Garantir que o ID seja um número válido
     const numericId = Number(id)
     if (!numericId || Number.isNaN(numericId)) {
@@ -686,7 +684,6 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
     }
 
     try {
-      console.log("Making DELETE request to:", `/api/bonificacoes/regras-idade/${numericId}`)
       const response = await fetch(`/api/bonificacoes/regras-idade/${numericId}`, {
         method: 'DELETE',
       })
@@ -813,7 +810,6 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
         
         // Usar o nome do campo do banco (snake_case)
         changedFields[dbField] = normalizedValue
-        console.log(`Field changed ${key} -> ${dbField}: "${oldStr}" -> "${newStr}"`)
       }
     })
 
@@ -842,12 +838,6 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
     // Adicionar o id no início
     const finalPayload = { id: editedData.id, ...cleanFields }
     
-    console.log("=== Payload to send ===")
-    console.log("Changed fields:", changedFields)
-    console.log("Clean fields:", cleanFields)
-    console.log("Final payload:", finalPayload)
-    console.log("JSON:", JSON.stringify(finalPayload, (key, value) => value === undefined ? null : value))
-    
     setLoading(true)
     try {
       const response = await fetch(`/api/bonificacoes/regras-idade/${editedData.id}`, {
@@ -855,8 +845,6 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalPayload)
       })
-
-      console.log("Response status:", response.status)
 
       if (!response.ok) {
         let errorMessage = 'Erro ao salvar alterações'
@@ -872,7 +860,6 @@ export function RegrasIdadeTable({ readOnly = false, title = "Gerenciamento de R
       }
 
       const result = await response.json()
-      console.log("Success response:", result)
 
       toast({
         title: "Sucesso",

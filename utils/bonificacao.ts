@@ -1,4 +1,4 @@
-export function formatVigenciaToKey(v?: string | Date | null) {
+function formatVigenciaToKey(v?: string | Date | null) {
   if (!v) return ""
   const d = typeof v === "string" ? new Date(v) : v
   if (Number.isNaN(d.getTime())) return ""

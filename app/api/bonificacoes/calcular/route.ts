@@ -10,12 +10,15 @@ interface CalcularRequest {
   modo: "automatico" | "periodo"
   data_inicial?: string
   data_final?: string
+  run_id?: string
+  session_id?: string
+  usuario_id?: number
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body: CalcularRequest = await request.json()
-    const { modo, data_inicial, data_final } = body
+    const { modo, data_inicial, data_final, run_id, session_id, usuario_id } = body
 
     // Validações
     if (!modo || !["automatico", "periodo"].includes(modo)) {
@@ -83,7 +86,10 @@ export async function POST(request: NextRequest) {
         unif_bonif: true,
         unif_com: true,
         df4_sem_pix: true
-      }
+      },
+      run_id: run_id || null,
+      session_id: session_id || null,
+      usuario_id: usuario_id || null
     }
 
     // Executar script Python
@@ -124,8 +130,6 @@ export async function POST(request: NextRequest) {
       // Coletar stderr
       pythonProcess.stderr.on('data', (data) => {
         stderr += data.toString()
-        // Log em tempo real para debug
-        console.log("[PYTHON STDERR]", data.toString().substring(0, 200))
       })
       
       // Enviar parâmetros via stdin
@@ -165,16 +169,10 @@ export async function POST(request: NextRequest) {
       stderr = result.stderr
       
       const executionTime = Date.now() - startTime
-      console.log(`Script Python executado em ${executionTime}ms`)
       
       // Capturar logs do stderr (prints redirecionados)
       if (stderr) {
         logs += stderr
-        console.log("[STDERR]", stderr.substring(0, 500)) // Log para debug
-      }
-      
-      if (stdout) {
-        console.log("[STDOUT]", stdout.substring(0, 500)) // Log para debug
       }
       
       // Extrair etapas dos logs (formato [ETAPA:XX%] mensagem)
@@ -190,8 +188,6 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      console.log(`[ETAPAS] Encontradas ${etapasEncontradas.length} etapas`)
-      console.log(`[STDOUT LENGTH] ${stdout.length} caracteres`)
       
       // Verificar se stdout está vazio ou muito pequeno
       if (!stdout || stdout.trim().length === 0) {
