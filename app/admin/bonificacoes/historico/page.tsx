@@ -797,16 +797,17 @@ export default function HistoricoBonificacoesPage() {
     const fallback = { key: ensureDoc() || "", typeCode: "03" as const }
 
     if (raw) {
+      const digits = onlyDigits(raw)
+
+      if (tipoChave.includes("cpf") || tipoChave.includes("cnpj") || isCpf(raw) || isCnpj(raw) || isCpf(digits) || isCnpj(digits)) {
+        return { key: digits || ensureDoc() || "", typeCode: "03" as const }
+      }
       if (tipoChave.includes("email") || isEmail(raw)) {
         return { key: raw, typeCode: "02" }
       }
       if (tipoChave.includes("celular") || tipoChave.includes("telefone") || classifyPhone(raw)) {
         const phone = formatPhoneKey(raw)
         return phone ? { key: phone, typeCode: "01" as const } : fallback
-      }
-      if (tipoChave.includes("cpf") || tipoChave.includes("cnpj") || isCpf(raw) || isCnpj(raw)) {
-        const digits = onlyDigits(raw)
-        return { key: digits || ensureDoc() || "", typeCode: "03" as const }
       }
 
       if (isEmail(raw)) {
@@ -817,7 +818,6 @@ export default function HistoricoBonificacoesPage() {
         return phone ? { key: phone, typeCode: "01" as const } : fallback
       }
 
-      const digits = onlyDigits(raw)
       if (digits) {
         return { key: digits, typeCode: "03" as const }
       }
