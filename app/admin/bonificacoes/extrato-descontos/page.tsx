@@ -241,6 +241,18 @@ export default function ExtratoDescontosPage() {
     setPage(1)
   }
 
+  const parseValorToNumber = (input: string | number): number => {
+    if (typeof input === "number") return input
+    const normalized = input
+      .trim()
+      .replace(/\./g, "")
+      .replace(/[^0-9,-]/g, "")
+    const isNegative = normalized.startsWith("-")
+    const numericPart = normalized.replace(/-/g, "").replace(",", ".")
+    const cleaned = (isNegative ? "-" : "") + numericPart
+    return parseFloat(cleaned)
+  }
+
   // Função para inserir movimentação
   const handleInsertMovimentacao = async () => {
     // Validações
@@ -254,7 +266,7 @@ export default function ExtratoDescontosPage() {
     }
 
     // Validar valor
-    const valorNumero = parseFloat(String(formData.valor).replace(/[^\d,]/g, "").replace(",", "."))
+    const valorNumero = parseValorToNumber(formData.valor || "")
     if (isNaN(valorNumero) || valorNumero === 0) {
       toast({
         title: "Erro de validação",
@@ -264,8 +276,6 @@ export default function ExtratoDescontosPage() {
       return
     }
 
-    // Quando for "desconto realizado", o valor deve ser positivo
-    // Manter o valor como está (positivo)
     const valorFinal = valorNumero
 
     setSubmitting(true)
@@ -1023,22 +1033,48 @@ export default function ExtratoDescontosPage() {
                   placeholder="0,00"
                   value={formData.valor}
                   onChange={(e) => {
-                    let value = e.target.value.replace(/[^\d,]/g, "")
-                    // Garantir apenas uma vírgula
-                    const parts = value.split(",")
-                    if (parts.length > 2) {
-                      value = parts[0] + "," + parts.slice(1).join("")
+                    let raw = e.target.value.replace(/[^0-9,-]/g, "")
+                    const isNegative = raw.startsWith("-")
+                    raw = raw.replace(/-/g, "")
+
+                    if (raw.startsWith(",")) {
+                      raw = "0" + raw
                     }
-                    // Limitar a 2 casas decimais
-                    if (parts[1] && parts[1].length > 2) {
-                      value = parts[0] + "," + parts[1].slice(0, 2)
+
+                    let beforeComma = raw
+                    let afterComma = ""
+
+                    const commaIndex = raw.indexOf(",")
+                    if (commaIndex !== -1) {
+                      beforeComma = raw.slice(0, commaIndex)
+                      afterComma = raw
+                        .slice(commaIndex + 1)
+                        .replace(/,/g, "")
+                        .replace(/[^0-9]/g, "")
+                        .slice(0, 2)
                     }
-                    setFormData({ ...formData, valor: value })
+
+                    let formatted = beforeComma
+                    if (commaIndex !== -1) {
+                      formatted += "," + afterComma
+                    }
+
+                    if (isNegative) {
+                      formatted = "-" + formatted
+                    }
+
+                    // Permitir apenas "-" temporariamente enquanto o usuário digita
+                    if (formatted === "-") {
+                      setFormData({ ...formData, valor: "-" })
+                      return
+                    }
+
+                    setFormData({ ...formData, valor: formatted })
                   }}
                   required
                 />
                 <p className="text-xs text-muted-foreground">
-                  Digite o valor positivo (ex: 100,50)
+                  Digite o valor (positivo ou negativo). Ex: 100,50 ou -50,00
                 </p>
               </div>
               <div className="space-y-2">

@@ -26,24 +26,30 @@ export async function POST(request: NextRequest) {
        WHERE last_heartbeat < DATE_SUB(NOW(), INTERVAL 30 MINUTE)`
     )
 
-    let totalCancelados = 0
+    let totalRemovidos = 0
 
     if (sessionsExpired.length > 0) {
       await connection.beginTransaction()
 
       try {
         for (const session of sessionsExpired) {
-          // Cancelar staging do run_id
+          // Guardar dt_referencia antes de remover (fallback para liberar lock)
+          const [dtInfo]: any = await connection.execute(
+            `SELECT DISTINCT dt_referencia 
+             FROM registro_bonificacao_descontos 
+             WHERE run_id = ? AND status = 'staging' 
+             LIMIT 1`,
+            [session.run_id]
+          )
+
+          // Remover staging do run_id
           const [result]: any = await connection.execute(
-            `UPDATE registro_bonificacao_descontos
-             SET status = 'cancelado',
-                 canceled_at = NOW(),
-                 is_active = FALSE
+            `DELETE FROM registro_bonificacao_descontos
              WHERE run_id = ? AND status = 'staging'`,
             [session.run_id]
           )
 
-          totalCancelados += result.affectedRows || 0
+          totalRemovidos += result.affectedRows || 0
 
           // Remover sessão
           await connection.execute(
@@ -58,12 +64,7 @@ export async function POST(request: NextRequest) {
           )
 
           if (sessionInfo.length === 0) {
-            // Buscar dt_referencia diretamente dos descontos
-            const [refInfo]: any = await connection.execute(
-              `SELECT DISTINCT dt_referencia FROM registro_bonificacao_descontos WHERE run_id = ? LIMIT 1`,
-              [session.run_id]
-            )
-
+            const refInfo = sessionInfo.length > 0 ? sessionInfo : dtInfo
             if (refInfo.length > 0) {
               await connection.execute(
                 `DELETE FROM locks_calculo WHERE dt_referencia = ?`,
@@ -87,8 +88,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Limpeza concluída. ${totalCancelados} registro(s) cancelado(s).`,
-      total_cancelados: totalCancelados
+      message: `Limpeza concluída. ${totalRemovidos} registro(s) removido(s).`,
+      total_removidos: totalRemovidos
     })
 
   } catch (error: any) {

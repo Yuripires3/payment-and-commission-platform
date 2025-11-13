@@ -30,18 +30,24 @@ export async function POST(request: NextRequest) {
     await connection.beginTransaction()
 
     try {
-      // Cancelar apenas registros em staging do run_id
+      // Guardar data de referência Antes de remover (usado para liberar lock se sessão não existir)
+      const [dtReferenciaInfo]: any = await connection.execute(
+        `SELECT DISTINCT dt_referencia 
+         FROM registro_bonificacao_descontos
+         WHERE run_id = ? AND status = 'staging'
+         LIMIT 1`,
+        [run_id]
+      )
+
+      // Remover registros em staging do run_id
       const [result]: any = await connection.execute(
-        `UPDATE registro_bonificacao_descontos
-         SET status = 'cancelado',
-             canceled_at = NOW(),
-             is_active = FALSE
-         WHERE run_id = ? 
+        `DELETE FROM registro_bonificacao_descontos
+         WHERE run_id = ?
            AND status = 'staging'`,
         [run_id]
       )
 
-      const totalCancelados = result.affectedRows || 0
+      const totalRemovidos = result.affectedRows || 0
 
       // Liberar lock
       const [sessionInfo]: any = await connection.execute(
@@ -53,6 +59,11 @@ export async function POST(request: NextRequest) {
         await connection.execute(
           `DELETE FROM locks_calculo WHERE dt_referencia = ?`,
           [sessionInfo[0].dt_referencia]
+        )
+      } else if (dtReferenciaInfo.length > 0) {
+        await connection.execute(
+          `DELETE FROM locks_calculo WHERE dt_referencia = ?`,
+          [dtReferenciaInfo[0].dt_referencia]
         )
       }
 
@@ -66,8 +77,8 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `${totalCancelados} registro(s) de desconto cancelado(s)`,
-        total_cancelados: totalCancelados
+        message: `${totalRemovidos} registro(s) de desconto removido(s)`,
+        total_removidos: totalRemovidos
       })
 
     } catch (error: any) {

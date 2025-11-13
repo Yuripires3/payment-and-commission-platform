@@ -174,9 +174,19 @@ export async function POST(request: NextRequest) {
     const numericCpf = String(cpf).replace(/\D/g, "").padStart(11, "0")
     
     // Converter valor para número
-    const valorNumero = typeof valor === 'string' 
-      ? parseFloat(valor.replace(/[^\d,]/g, "").replace(",", ".")) 
-      : parseFloat(String(valor))
+    const parseValor = (input: string | number): number => {
+      if (typeof input === "number") return input
+      const normalized = input
+        .trim()
+        .replace(/\./g, "")
+        .replace(/[^0-9,-]/g, "")
+      const isNegative = normalized.startsWith("-")
+      const numericPart = normalized.replace(/-/g, "").replace(",", ".")
+      const cleaned = (isNegative ? "-" : "") + numericPart
+      return parseFloat(cleaned)
+    }
+
+    const valorNumero = parseValor(valor)
 
     if (isNaN(valorNumero)) {
       return NextResponse.json(
@@ -195,13 +205,16 @@ export async function POST(request: NextRequest) {
     // Data/hora de registro
     const registro = formatDateTimeLocal(new Date())
 
+    const dtReferencia = dt_movimentacao
+
     // Inserir registro
     const [result]: any = await connection.execute(
       `INSERT INTO registro_bonificacao_descontos 
-       (dt_movimentacao, cpf, nome, valor, dt_apuracao, tipo_movimentacao, proposta, dt_exclusao_proposta, registro)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (dt_movimentacao, dt_referencia, cpf, nome, valor, dt_apuracao, tipo_movimentacao, proposta, dt_exclusao_proposta, status, is_active, finalizado_at, origem, registro)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'finalizado', TRUE, NOW(), 'manual', ?)`,
       [
         dt_movimentacao || null,
+        dtReferencia || null,
         numericCpf || null,
         nome || null,
         valorNumero || null,
