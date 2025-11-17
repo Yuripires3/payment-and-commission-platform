@@ -27,6 +27,7 @@ const bonificacoesSubmenu = [
   { label: "Calcular Bonificação", href: "/admin/bonificacoes/calculo", icon: Calculator },
   { label: "Histórico de Bonificações", href: "/admin/bonificacoes/historico", icon: History },
   { label: "Extrato de Descontos", href: "/admin/bonificacoes/extrato-descontos", icon: Receipt },
+  { label: "Extrato de Propostas", href: "/admin/bonificacoes/extrato-propostas", icon: Receipt },
 ]
 
 const configuracoesSubmenu = [
@@ -79,7 +80,8 @@ export function AdminSidebar() {
                       return (
                         subItem.href === "/admin" ||
                         subItem.href === "/admin/bonificacoes/historico" ||
-                        subItem.href === "/admin/bonificacoes/extrato-descontos"
+                        subItem.href === "/admin/bonificacoes/extrato-descontos" ||
+                        subItem.href === "/admin/bonificacoes/extrato-propostas"
                       )
                     }
                     return true
